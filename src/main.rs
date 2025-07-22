@@ -1,6 +1,8 @@
 use std::{ffi::CString, fs, path};
 
 mod base;
+mod index;
+mod objects;
 mod utils;
 
 fn main() {
