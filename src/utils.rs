@@ -1,3 +1,5 @@
+use sha1::{Digest, Sha1};
+
 #[cfg(target_os = "linux")]
 pub fn get_file_info(path: &str) -> libc::stat {
     println!("Path: {}", path);
@@ -19,4 +21,12 @@ pub fn get_file_info(path: &str) -> libc::stat {
 #[cfg(target_os = "windows")]
 pub fn get_file_info(path: &str) {
     panic!("Not supported, windows users fuck off for now");
+}
+
+pub fn generate_filename(content: &[u8]) -> String {
+    let mut hasher = Sha1::new();
+    hasher.update(content);
+
+    let result = hasher.finalize();
+    String::from_utf8(result.to_ascii_lowercase()).unwrap()
 }
