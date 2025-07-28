@@ -2,11 +2,12 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path;
 
-pub const GILLTTER_PATH: &str = ".gilltter";
-pub const GILLTER_OBJECTS_DIR: &str = "objects";
-pub const GILLTER_HEAD_FILE: &str = "head";
-pub const GILLTER_STATE_FILE: &str = "state"; // A.k.a git INDEX file
-pub const GILLTER_BRANCHES_DIR: &str = "branches";
+pub const GILLTTER_PATH: &'static str = ".gilltter";
+
+pub const GILLTER_OBJECTS_DIR: &'static str = "objects";
+pub const GILLTER_HEAD_FILE: &'static str = "head";
+pub const GILLTER_STATE_FILE: &'static str = "state"; // A.k.a git INDEX file
+pub const GILLTER_BRANCHES_DIR: &'static str = "branches";
 
 pub fn make_sure_gilltter_dir_exists() -> anyhow::Result<()> {
     if !fs::exists(GILLTTER_PATH)?

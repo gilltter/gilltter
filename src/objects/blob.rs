@@ -1,8 +1,15 @@
-use std::{fs, io::Read};
+use std::{
+    fs::{self, File},
+    io::{Read, Write},
+};
 
 use anyhow::anyhow;
 
-use crate::{objects::ToFile, utils};
+use crate::{
+    base::{GILLTER_OBJECTS_DIR, GILLTTER_PATH},
+    objects::ObjectDump,
+    utils,
+};
 
 pub struct Blob {
     content: Vec<u8>,
@@ -53,9 +60,30 @@ impl Blob {
             }
         }
     }
+
+    pub fn from_data(data: &[u8]) -> anyhow::Result<Self> {
+        let file_contents = utils::decompress(&data)?;
+
+        let null_pos = file_contents
+            .iter()
+            .position(|element| *element == *"\0".as_bytes().first().unwrap())
+            .ok_or(anyhow!("No null terminator in file"))?;
+
+        let header = &file_contents[..null_pos];
+        let content = &file_contents[null_pos..];
+
+        let file_type = &header[0..4];
+        if file_type != "blob".as_bytes() {
+            return Err(anyhow!("File is not of type blob"));
+        }
+
+        return Ok(Blob {
+            content: content[1..].to_owned(),
+        });
+    }
 }
 
-impl ToFile for Blob {
+impl ObjectDump for Blob {
     fn convert_to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.reserve(self.content.len() + 8);
@@ -64,5 +92,18 @@ impl ToFile for Blob {
         bytes.extend_from_slice("\0".as_bytes());
         bytes.extend_from_slice(&self.content);
         bytes
+    }
+
+    fn dump_to_file(&self) -> anyhow::Result<String> {
+        let blob_content = self.convert_to_bytes();
+        let filedata = utils::compress(&blob_content)?;
+        let filename = utils::generate_filename(&blob_content);
+
+        let path =
+            String::from(GILLTTER_PATH) + "/" + GILLTER_OBJECTS_DIR + "/" + filename.as_str();
+        let mut file = File::create(path)?;
+        file.write_all(&filedata)?;
+        file.flush()?;
+        Ok(filename)
     }
 }
