@@ -28,5 +28,7 @@ pub fn generate_filename(content: &[u8]) -> String {
     hasher.update(content);
 
     let result = hasher.finalize();
-    String::from_utf8(result.to_ascii_lowercase()).unwrap()
+
+    let str = format!("{:x}", result);
+    str
 }

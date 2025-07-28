@@ -1,6 +1,9 @@
 use std::{fs::File, io::Write};
 
-use crate::objects::{ToFile, blob::Blob};
+use crate::{
+    objects::{ToFile, blob::Blob},
+    utils::generate_filename,
+};
 
 mod base;
 mod index;
@@ -24,10 +27,18 @@ fn main() {
     blob.append_data("niggas faggots".as_bytes());
     // write to file
     // then read from file
-    let mut file = File::create("fuck.me").unwrap();
-    file.write(&blob.convert_to_bytes()).unwrap();
+
+    let content = blob.convert_to_bytes();
+
+    let mut file = File::create(generate_filename(&content)).unwrap();
+    file.write(&content).unwrap();
     file.flush().unwrap();
     drop(file);
 
-    println!("Hello, Dear gilltter users!");
+    let blob = Blob::from_file(&generate_filename(&content)).unwrap();
+    println!(
+        "Contents: '{}', sz: {}",
+        String::from_utf8_lossy(&blob.get_data()),
+        String::from_utf8_lossy(&blob.get_data()).len()
+    );
 }

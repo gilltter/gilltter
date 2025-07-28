@@ -26,7 +26,7 @@ impl Blob {
     pub fn set_data(&mut self, data: &[u8]) {
         self.content = data.to_owned();
     }
-    fn from_file(filepath: &str) -> anyhow::Result<Self> {
+    pub fn from_file(filepath: &str) -> anyhow::Result<Self> {
         match fs::File::open(filepath) {
             Ok(mut file) => {
                 let mut file_contents = Vec::new();
@@ -34,7 +34,7 @@ impl Blob {
 
                 let null_pos = file_contents
                     .iter()
-                    .position(|element| *element == '\0' as u8)
+                    .position(|element| *element == *"\0".as_bytes().first().unwrap())
                     .ok_or(anyhow!("No null terminator in file"))?;
 
                 let header = &file_contents[..null_pos];
@@ -47,7 +47,7 @@ impl Blob {
 
                 // let bytes_size = u32::from_ne_bytes(header[5..null_pos].try_into().unwrap());
                 return Ok(Blob {
-                    content: content.to_owned(),
+                    content: content[1..].to_owned(),
                 });
             }
             Err(why) => {
