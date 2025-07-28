@@ -1,11 +1,8 @@
-use std::{
-    fs,
-    io::{Read, Seek},
-};
+use std::{fs, io::Read};
 
 use anyhow::anyhow;
 
-use crate::objects::ToFile;
+use crate::{objects::ToFile, utils};
 
 pub struct Blob {
     content: Vec<u8>,
@@ -20,7 +17,7 @@ impl Blob {
         self.content.clone()
     }
 
-    pub fn append_data(&mut self, data: &[u8]) {
+    pub fn _append_data(&mut self, data: &[u8]) {
         self.content.extend_from_slice(data);
     }
     pub fn set_data(&mut self, data: &[u8]) {
@@ -31,6 +28,7 @@ impl Blob {
             Ok(mut file) => {
                 let mut file_contents = Vec::new();
                 file.read_to_end(&mut file_contents)?;
+                let file_contents = utils::decompress(&file_contents)?;
 
                 let null_pos = file_contents
                     .iter()
@@ -45,7 +43,6 @@ impl Blob {
                     return Err(anyhow!("File is not of type blob"));
                 }
 
-                // let bytes_size = u32::from_ne_bytes(header[5..null_pos].try_into().unwrap());
                 return Ok(Blob {
                     content: content[1..].to_owned(),
                 });

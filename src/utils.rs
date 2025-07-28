@@ -1,3 +1,6 @@
+use std::io::{Read, Write};
+
+use flate2::{Compression, read::ZlibDecoder, write::ZlibEncoder};
 use sha1::{Digest, Sha1};
 
 #[cfg(target_os = "linux")]
@@ -26,9 +29,21 @@ pub fn get_file_info(path: &str) {
 pub fn generate_filename(content: &[u8]) -> String {
     let mut hasher = Sha1::new();
     hasher.update(content);
-
     let result = hasher.finalize();
-
     let str = format!("{:x}", result);
     str
+}
+
+pub fn compress(contents: &[u8]) -> anyhow::Result<Vec<u8>> {
+    let mut e = ZlibEncoder::new(Vec::new(), Compression::default());
+    e.write_all(contents)?;
+    let compressed = e.finish()?;
+    Ok(compressed)
+}
+
+pub fn decompress(contents: &[u8]) -> anyhow::Result<Vec<u8>> {
+    let mut d = ZlibDecoder::new(contents);
+    let mut buf = Vec::new();
+    d.read_to_end(&mut buf)?;
+    Ok(buf)
 }
