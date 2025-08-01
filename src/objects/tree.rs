@@ -74,9 +74,7 @@ impl Tree {
 impl ObjectDump for Tree {
     fn convert_to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
-        bytes.reserve(4 + 4 + self.objects.len() * (1 + 8 + 20)); // Approxim.
-
-        bytes.extend_from_slice("tree ".as_bytes());
+        bytes.extend_from_slice("tree ".as_bytes()); // TODO: Remove hardcoded stuff
 
         // Count bytes
         let mut bytes_cnt = 0;
@@ -116,37 +114,50 @@ impl ObjectPump for Tree {
         let mut tree = Tree::new();
         let data = utils::decompress(data)?;
 
-        if &data[0..4] != "tree".as_bytes() {
-            return Err(anyhow!("Object type is incorrect"));
-        }
-
         let null_pos = data
             .iter()
             .position(|element| *element == *"\0".as_bytes().first().unwrap())
             .ok_or(anyhow!("No null terminator in file"))?;
+        let header = &data[0..null_pos];
+        let content = &data[null_pos + 1..];
 
-        let size_tree_bytes = &data[5..null_pos];
+        if &header[0..4] != "tree".as_bytes() {
+            return Err(anyhow!("Object type is incorrect"));
+        }
+
+        let size_tree_bytes = &header[5..null_pos];
         let _size_tree: u32 = String::from_utf8_lossy(size_tree_bytes)
             .trim()
             .parse::<u32>()?;
 
-        let mut data = &data[null_pos + 1..];
+        let mut data = content;
         while !data.is_empty() {
             // Some cycle maybe
             let obj_type_byte = data[0];
             let obj_type = ObjectType::from_byte(obj_type_byte);
 
+            if data.len() <= 2 {
+                return Err(anyhow!("Format error"));
+            }
             data = &data[2..];
             let null_pos = data
                 .iter()
                 .position(|element| *element == *"\0".as_bytes().first().unwrap())
                 .ok_or(anyhow!("No null terminator in file"))?;
+
             let filepath = String::from_utf8_lossy(&data[0..null_pos]).to_string();
 
             data = &data[null_pos + 1..]; // We skipped \0 now we at sha1
-            let sha1_pointer = String::from_utf8_lossy(&data[0..40]).to_string(); // sha1 is 40 bytes
+            if data.len() < 40 {
+                return Err(anyhow!("Tree is weirdly formatted"));
+            }
 
-            tree.add_object(Object::new(obj_type, filepath, sha1_pointer));
+            let sha1_pointer = String::from_utf8_lossy(&data[0..40]).to_string(); // sha1 is 40 bytes
+            tree.add_object(Object::new(
+                obj_type,
+                filepath.clone(),
+                sha1_pointer.clone(),
+            ));
 
             data = &data[40..];
         }
@@ -165,6 +176,70 @@ impl ObjectPump for Tree {
                 eprintln!("Could not open the file: {}", why);
                 return Err(anyhow!("Could not open the file"));
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::objects::blob::Blob;
+
+    use super::*;
+
+    fn gilltter_add(filepath: &str) -> String {
+        let mut file = File::open(filepath).unwrap();
+        let mut contents = Vec::new();
+        file.read_to_end(&mut contents).unwrap();
+
+        let mut blob = Blob::new();
+        blob.set_data(&contents);
+
+        let filename = blob.dump_to_file().unwrap();
+        filename
+    }
+
+    #[test]
+    fn create_tree_dump_then_load() {
+        let mut index_mock: HashMap<String, Object> = HashMap::new();
+
+        // Imagine git add
+        {
+            let utils_filepath = String::from("src/utils.rs");
+            let utils_sha1 = gilltter_add(&utils_filepath);
+            index_mock.insert(
+                utils_sha1.clone(),
+                Object::new(
+                    objects::tree::ObjectType::Blob,
+                    utils_filepath.to_string(),
+                    utils_sha1.clone(),
+                ),
+            );
+
+            let base_filepath = String::from("src/base.rs");
+            let base_sha1 = gilltter_add(&base_filepath);
+            index_mock.insert(
+                base_sha1.clone(),
+                Object::new(
+                    objects::tree::ObjectType::Blob,
+                    base_filepath.to_string(),
+                    base_sha1.clone(),
+                ),
+            );
+
+            // Build a tree
+            let mut tree = Tree::new();
+
+            for (_, value) in index_mock.into_iter() {
+                tree.add_object(Object::new(
+                    ObjectType::Blob,
+                    value.filepath,
+                    value.sha1_pointer,
+                ));
+            }
+
+            let name = tree.dump_to_file().unwrap();
+
+            Tree::from_file(&format!(".gilltter/objects/{}", name)).unwrap();
         }
     }
 }

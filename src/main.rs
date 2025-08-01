@@ -79,8 +79,14 @@ fn main() {
 
         // Build a tree
         let mut tree = Tree::new();
-        tree.add_object(Object::new(ObjectType::Blob, utils_filepath, utils_sha1));
-        tree.add_object(Object::new(ObjectType::Blob, base_filepath, base_sha1));
+
+        for (_, value) in index_mock.into_iter() {
+            tree.add_object(Object::new(
+                ObjectType::Blob,
+                value.filepath,
+                value.sha1_pointer,
+            ));
+        }
 
         let name = tree.dump_to_file().unwrap();
 
@@ -92,6 +98,14 @@ fn main() {
                 value.obj_type as u32, value.filepath, value.sha1_pointer
             );
         }
+    }
+
+    {
+        // test stuff
+        let blob = Blob::from_file(&format!(
+            ".gilltter/objects/b012c73abec3139ca2dc3424ca3703291f804b1f"
+        ))
+        .unwrap();
     }
 
     // Pick file

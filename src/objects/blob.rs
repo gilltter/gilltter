@@ -24,7 +24,7 @@ impl Blob {
         self.content.clone()
     }
 
-    pub fn _append_data(&mut self, data: &[u8]) {
+    pub fn append_data(&mut self, data: &[u8]) {
         self.content.extend_from_slice(data);
     }
     pub fn set_data(&mut self, data: &[u8]) {
@@ -57,11 +57,21 @@ impl ObjectPump for Blob {
             .ok_or(anyhow!("No null terminator in file"))?;
 
         let header = &file_contents[..null_pos];
-        let content = &file_contents[null_pos..];
+        let content = &file_contents[null_pos + 1..];
 
         let file_type = &header[0..4];
         if file_type != "blob".as_bytes() {
             return Err(anyhow!("File is not of type blob"));
+        }
+        let blob_size: usize = String::from_utf8_lossy(&header[5..null_pos])
+            .parse()
+            .unwrap();
+        if blob_size != content.len() {
+            return Err(anyhow!(
+                "Blob size doesn't match actual content size: {} vs {}",
+                blob_size,
+                content.len()
+            ));
         }
 
         return Ok(Blob {
@@ -73,7 +83,6 @@ impl ObjectPump for Blob {
 impl ObjectDump for Blob {
     fn convert_to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
-        bytes.reserve(self.content.len() + 8);
         bytes.extend_from_slice("blob ".as_bytes());
         bytes.extend_from_slice(&self.content.len().to_string().as_bytes());
         bytes.extend_from_slice("\0".as_bytes());
@@ -92,5 +101,23 @@ impl ObjectDump for Blob {
         file.write_all(&filedata)?;
         file.flush()?;
         Ok(filename)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn add_blob_and_load_it() {
+        let mut contents = Vec::<u8>::new();
+        contents.extend_from_slice("heil gilltter".as_bytes());
+
+        let mut blob = Blob::new();
+        blob.set_data(&contents);
+
+        let filename = blob.dump_to_file().unwrap();
+        println!("f: {}", filename);
+        let blob = Blob::from_file(&format!(".gilltter/objects/{}", filename)).unwrap();
     }
 }
