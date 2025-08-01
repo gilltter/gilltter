@@ -1,11 +1,16 @@
 use std::{
+    collections::HashMap,
     fs::File,
     io::{Read, Write},
 };
 
 use crate::{
     base::{GILLTER_OBJECTS_DIR, GILLTTER_PATH},
-    objects::{ObjectDump, blob::Blob},
+    objects::{
+        ObjectDump, ObjectPump,
+        blob::Blob,
+        tree::{Object, ObjectType, Tree},
+    },
 };
 
 mod base;
@@ -37,15 +42,6 @@ fn gilltter_add(filepath: &str) -> String {
 
     let filename = blob.dump_to_file().unwrap();
     filename
-    // let blob_content = blob.convert_to_bytes();
-    // let filedata = utils::compress(&blob_content).unwrap();
-    // let filename = utils::generate_filename(&blob_content);
-
-    // let path = String::from(GILLTTER_PATH) + "/" + GILLTER_OBJECTS_DIR + "/" + filename.as_str();
-    // let mut file = File::create(path).unwrap();
-    // file.write_all(&filedata).unwrap();
-    // file.flush().unwrap();
-    // filename
 }
 
 fn gilltter_pick_blob(filepath: &str) -> Blob {
@@ -55,14 +51,47 @@ fn gilltter_pick_blob(filepath: &str) -> Blob {
 fn main() {
     gilltter_init();
 
+    let mut index_mock: HashMap<String, Object> = HashMap::new();
+
     // Imagine git add
     {
-        let filename = gilltter_add("src/utils.rs");
-
-        let blob = gilltter_pick_blob(
-            &(String::from(GILLTTER_PATH) + "/" + GILLTER_OBJECTS_DIR + "/" + filename.as_str()),
+        let utils_filepath = String::from("src/utils.rs");
+        let utils_sha1 = gilltter_add(&utils_filepath);
+        index_mock.insert(
+            utils_sha1.clone(),
+            Object::new(
+                objects::tree::ObjectType::Blob,
+                utils_filepath.to_string(),
+                utils_sha1.clone(),
+            ),
         );
-        println!("Content: {}", String::from_utf8_lossy(&blob.get_data()))
+
+        let base_filepath = String::from("src/base.rs");
+        let base_sha1 = gilltter_add(&base_filepath);
+        index_mock.insert(
+            base_sha1.clone(),
+            Object::new(
+                objects::tree::ObjectType::Blob,
+                base_filepath.to_string(),
+                base_sha1.clone(),
+            ),
+        );
+
+        // Build a tree
+        let mut tree = Tree::new();
+        tree.add_object(Object::new(ObjectType::Blob, utils_filepath, utils_sha1));
+        tree.add_object(Object::new(ObjectType::Blob, base_filepath, base_sha1));
+
+        let name = tree.dump_to_file().unwrap();
+
+        let tree = Tree::from_file(&format!(".gilltter/objects/{}", name)).unwrap();
+        let tree_objects = tree.get_objects();
+        for (_, value) in tree_objects.into_iter() {
+            println!(
+                "{} {} {}",
+                value.obj_type as u32, value.filepath, value.sha1_pointer
+            );
+        }
     }
 
     // Pick file

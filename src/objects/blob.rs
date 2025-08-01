@@ -7,7 +7,7 @@ use anyhow::anyhow;
 
 use crate::{
     base::{GILLTER_OBJECTS_DIR, GILLTTER_PATH},
-    objects::ObjectDump,
+    objects::{ObjectDump, ObjectPump},
     utils,
 };
 
@@ -30,29 +30,16 @@ impl Blob {
     pub fn set_data(&mut self, data: &[u8]) {
         self.content = data.to_owned();
     }
-    pub fn from_file(filepath: &str) -> anyhow::Result<Self> {
+}
+
+impl ObjectPump for Blob {
+    fn from_file(filepath: &str) -> anyhow::Result<Self> {
         match fs::File::open(filepath) {
             Ok(mut file) => {
                 let mut file_contents = Vec::new();
                 file.read_to_end(&mut file_contents)?;
-                let file_contents = utils::decompress(&file_contents)?;
 
-                let null_pos = file_contents
-                    .iter()
-                    .position(|element| *element == *"\0".as_bytes().first().unwrap())
-                    .ok_or(anyhow!("No null terminator in file"))?;
-
-                let header = &file_contents[..null_pos];
-                let content = &file_contents[null_pos..];
-
-                let file_type = &header[0..4];
-                if file_type != "blob".as_bytes() {
-                    return Err(anyhow!("File is not of type blob"));
-                }
-
-                return Ok(Blob {
-                    content: content[1..].to_owned(),
-                });
+                return Blob::from_data(&file_contents);
             }
             Err(why) => {
                 eprintln!("Could not open the file: {}", why);
@@ -61,7 +48,7 @@ impl Blob {
         }
     }
 
-    pub fn from_data(data: &[u8]) -> anyhow::Result<Self> {
+    fn from_data(data: &[u8]) -> anyhow::Result<Self> {
         let file_contents = utils::decompress(&data)?;
 
         let null_pos = file_contents
