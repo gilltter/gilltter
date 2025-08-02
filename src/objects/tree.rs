@@ -8,7 +8,7 @@ use anyhow::anyhow;
 
 use crate::{
     base::{GILLTER_OBJECTS_DIR, GILLTTER_PATH},
-    objects::{self, ObjectDump, ObjectPump},
+    objects::{self, ObjectDump, ObjectPump, SPACE_STR},
     utils,
 };
 
@@ -17,6 +17,8 @@ pub enum ObjectType {
     Blob,
     Tree,
 }
+
+const TREE_TYPE_STRING: &'static [u8] = b"tree";
 
 impl ObjectType {
     fn to_bytes(&self) -> Vec<u8> {
@@ -74,7 +76,8 @@ impl Tree {
 impl ObjectDump for Tree {
     fn convert_to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
-        bytes.extend_from_slice("tree ".as_bytes()); // TODO: Remove hardcoded stuff
+        bytes.extend_from_slice(TREE_TYPE_STRING); // TODO: Remove hardcoded stuff
+        bytes.extend_from_slice(SPACE_STR);
 
         // Count bytes
         let mut bytes_cnt = 0;
@@ -121,7 +124,7 @@ impl ObjectPump for Tree {
         let header = &data[0..null_pos];
         let content = &data[null_pos + 1..];
 
-        if &header[0..4] != "tree".as_bytes() {
+        if &header[0..4] != TREE_TYPE_STRING {
             return Err(anyhow!("Object type is incorrect"));
         }
 

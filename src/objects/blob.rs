@@ -5,9 +5,11 @@ use std::{
 
 use anyhow::anyhow;
 
+const BLOB_TYPE_STRING: &'static [u8] = b"blob";
+
 use crate::{
     base::{GILLTER_OBJECTS_DIR, GILLTTER_PATH},
-    objects::{ObjectDump, ObjectPump},
+    objects::{ObjectDump, ObjectPump, SPACE_STR},
     utils,
 };
 
@@ -60,7 +62,7 @@ impl ObjectPump for Blob {
         let content = &file_contents[null_pos + 1..];
 
         let file_type = &header[0..4];
-        if file_type != "blob".as_bytes() {
+        if file_type != BLOB_TYPE_STRING {
             return Err(anyhow!("File is not of type blob"));
         }
         let blob_size: usize = String::from_utf8_lossy(&header[5..null_pos])
@@ -83,7 +85,8 @@ impl ObjectPump for Blob {
 impl ObjectDump for Blob {
     fn convert_to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
-        bytes.extend_from_slice("blob ".as_bytes());
+        bytes.extend_from_slice(BLOB_TYPE_STRING);
+        bytes.extend_from_slice(SPACE_STR);
         bytes.extend_from_slice(&self.content.len().to_string().as_bytes());
         bytes.extend_from_slice("\0".as_bytes());
         bytes.extend_from_slice(&self.content);
