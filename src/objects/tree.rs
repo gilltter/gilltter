@@ -18,7 +18,7 @@ pub enum ObjectType {
     Tree,
 }
 
-const TREE_TYPE_STRING: &'static [u8] = b"tree";
+pub const TREE_TYPE_STRING: &'static [u8] = b"tree";
 
 impl ObjectType {
     fn to_bytes(&self) -> Vec<u8> {
@@ -103,8 +103,11 @@ impl ObjectDump for Tree {
         let filedata = utils::compress(&tree_content)?;
         let filename = utils::generate_filename(&tree_content);
 
-        let path =
-            String::from(GILLTTER_PATH) + "/" + GILLTER_OBJECTS_DIR + "/" + filename.as_str();
+        let path = String::from(GILLTTER_PATH)
+            + utils::get_separator()
+            + GILLTER_OBJECTS_DIR
+            + utils::get_separator()
+            + filename.as_str();
         let mut file = File::create(path)?;
         file.write_all(&filedata)?;
         file.flush()?;
@@ -119,16 +122,16 @@ impl ObjectPump for Tree {
 
         let null_pos = data
             .iter()
-            .position(|element| *element == *"\0".as_bytes().first().unwrap())
+            .position(|element| *element == "\0".as_bytes()[0])
             .ok_or(anyhow!("No null terminator in file"))?;
         let header = &data[0..null_pos];
         let content = &data[null_pos + 1..];
 
-        if &header[0..4] != TREE_TYPE_STRING {
+        if &header[0..TREE_TYPE_STRING.len()] != TREE_TYPE_STRING {
             return Err(anyhow!("Object type is incorrect"));
         }
 
-        let size_tree_bytes = &header[5..null_pos];
+        let size_tree_bytes = &header[TREE_TYPE_STRING.len() + 1..null_pos];
         let _size_tree: u32 = String::from_utf8_lossy(size_tree_bytes)
             .trim()
             .parse::<u32>()?;

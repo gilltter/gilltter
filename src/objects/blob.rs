@@ -98,8 +98,11 @@ impl ObjectDump for Blob {
         let filedata = utils::compress(&blob_content)?;
         let filename = utils::generate_filename(&blob_content);
 
-        let path =
-            String::from(GILLTTER_PATH) + "/" + GILLTER_OBJECTS_DIR + "/" + filename.as_str();
+        let path = String::from(GILLTTER_PATH)
+            + utils::get_separator()
+            + GILLTER_OBJECTS_DIR
+            + utils::get_separator()
+            + filename.as_str();
         let mut file = File::create(path)?;
         file.write_all(&filedata)?;
         file.flush()?;

@@ -23,7 +23,16 @@ pub fn get_file_info(path: &str) -> libc::stat {
 
 #[cfg(target_os = "windows")]
 pub fn get_file_info(path: &str) {
-    panic!("Not supported, windows users fuck off for now");
+    panic!("Not supported, windows users fuck off");
+}
+
+#[cfg(target_family = "unix")]
+pub const fn get_separator() -> &'static str {
+    "/"
+}
+#[cfg(target_family = "windows")]
+pub const fn get_separator() -> &'static str {
+    "\\"
 }
 
 pub fn generate_filename(content: &[u8]) -> String {
