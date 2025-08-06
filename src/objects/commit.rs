@@ -41,24 +41,41 @@ impl Commit {
         self
     }
 
+    pub fn get_tree_sha(&self) -> Option<String> {
+        self.tree_sha.clone()
+    }
+
     pub fn set_parent_commit_sha(&mut self, sha: impl Into<String>) -> &mut Self {
         self.parent_commit_sha = Some(sha.into());
         self
+    }
+
+    pub fn get_parent_commit_sha(&self) -> Option<String> {
+        self.parent_commit_sha.clone()
     }
 
     pub fn set_username(&mut self, username: impl Into<String>) -> &mut Self {
         self.username = Some(username.into());
         self
     }
+    pub fn get_username(&self) -> Option<String> {
+        self.username.clone()
+    }
 
     pub fn set_email(&mut self, email: impl Into<String>) -> &mut Self {
         self.email = Some(email.into());
         self
     }
+    pub fn get_email(&self) -> Option<String> {
+        self.email.clone()
+    }
 
     pub fn set_message(&mut self, message: impl Into<String>) -> &mut Self {
         self.message = Some(message.into());
         self
+    }
+    pub fn get_message(&self) -> Option<String> {
+        self.message.clone()
     }
 }
 
@@ -78,10 +95,10 @@ impl ObjectDump for Commit {
             + self.username.as_ref().unwrap().len()
             + self.email.as_ref().unwrap().len()
             + self.message.as_ref().unwrap_or(&String::new()).len();
-        panic!("BYTES_CNT INCORRECT");
+        // panic!("BYTES_CNT INCORRECT"); TODO: FIX
 
         bytes.extend_from_slice(COMMIT_TYPE_STRING);
-        bytes.extend_from_slice(format!("{}\0", bytes_cnt).as_bytes());
+        bytes.extend_from_slice(format!(" {}\0", bytes_cnt).as_bytes());
 
         // Tree setup
         bytes.extend_from_slice(format!("tree {}", self.tree_sha.as_ref().unwrap()).as_bytes());
@@ -165,17 +182,19 @@ impl ObjectPump for Commit {
         data = &data[40..];
 
         // get parent
+        let debug_str = String::from_utf8_lossy(data);
+        println!("Parent debug: {}", debug_str);
         let parent_type_str = &data[0.."parent".len()];
-        if parent_type_str != b"parent" {
-            return Err(anyhow!("Want a parent here fuck u"));
+        if parent_type_str == b"parent" {
+            // its ok, no parent
+            data = &data["parent".len() + 1..];
+            let parent_sha = String::from_utf8_lossy(&data[0..40]);
+            commit.set_parent_commit_sha(parent_sha);
+
+            // Get author
+            data = &data[40..];
+            // return Err(anyhow!("Want a parent here fuck u"));
         }
-
-        data = &data["parent".len() + 1..];
-        let parent_sha = String::from_utf8_lossy(&data[0..40]);
-        commit.set_parent_commit_sha(parent_sha);
-
-        // Get author
-        data = &data[40..];
 
         let author_str = &data[0.."author".len()];
         if author_str != b"author" {
@@ -244,5 +263,96 @@ impl ObjectPump for Commit {
                 return Err(anyhow!("Could not open file: {}", why));
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use crate::{
+        config::Config,
+        objects::{
+            self,
+            blob::Blob,
+            tree::{Object, ObjectType, Tree},
+        },
+    };
+
+    use super::*;
+
+    fn gilltter_add(filepath: &str) -> String {
+        // let mut file = File::open(filepath).unwrap();
+        // let mut contents = Vec::new();
+        // file.read_to_end(&mut contents).unwrap();
+
+        let mut blob = Blob::new();
+        blob.set_data(filepath.as_bytes());
+
+        let filename = blob.dump_to_file().unwrap();
+        filename
+    }
+
+    #[test]
+    fn create_commit_and_load_then() {
+        let mut index_mock: HashMap<String, Object> = HashMap::new();
+        let utils_filepath = String::from("src/utils.rs");
+        let utils_sha1 = gilltter_add(&utils_filepath);
+        index_mock.insert(
+            utils_sha1.clone(),
+            Object::new(
+                objects::tree::ObjectType::Blob,
+                utils_filepath.to_string(),
+                utils_sha1.clone(),
+            ),
+        );
+
+        let base_filepath = String::from("src/base.rs");
+        let base_sha1 = gilltter_add(&base_filepath);
+        index_mock.insert(
+            base_sha1.clone(),
+            Object::new(
+                objects::tree::ObjectType::Blob,
+                base_filepath.to_string(),
+                base_sha1.clone(),
+            ),
+        );
+
+        // Build a tree
+        let mut tree = Tree::new();
+
+        for (_, value) in index_mock.into_iter() {
+            tree.add_object(Object::new(
+                ObjectType::Blob,
+                value.filepath,
+                value.sha1_pointer,
+            ));
+        }
+
+        let tree_name = tree.dump_to_file().unwrap();
+
+        let tree = Tree::from_file(&format!(".gilltter/objects/{}", tree_name)).unwrap();
+
+        // now build a commit
+        // we need tree, parent, user, message in commit
+        let config = Config::from_file(".gilltter/config").unwrap();
+        let username = config.get("Account", "username").unwrap();
+        let email = config.get("Account", "email").unwrap();
+
+        let mut commit = Commit::new();
+        commit.set_tree_sha(tree_name);
+        commit.set_username(username);
+        commit.set_email(email);
+        commit.set_message("fuck niggas");
+
+        let commit_name = commit.dump_to_file().unwrap();
+
+        let commit = Commit::from_file(&format!(".gilltter/objects/{}", commit_name)).unwrap();
+        println!(
+            "'{}' '{}' '{}'",
+            commit.get_email().unwrap(),
+            commit.get_username().unwrap(),
+            commit.get_message().unwrap()
+        );
     }
 }

@@ -8,13 +8,16 @@
 use std::{
     collections::HashMap,
     fs::File,
-    io::{BufRead, BufReader, Cursor},
+    io::{BufRead, BufReader, Cursor, Read},
     path,
 };
 
 use anyhow::anyhow;
 
-use crate::base::{GILLTER_CONFIG_FILE, GILLTTER_PATH};
+use crate::{
+    base::{GILLTER_CONFIG_FILE, GILLTTER_PATH},
+    objects::ObjectPump,
+};
 
 pub struct Config {
     variables: HashMap<String, HashMap<String, String>>, // Category -> [<var-name> <var-value, ...]
@@ -66,5 +69,23 @@ impl Config {
         self.variables
             .get(category_name)
             .and_then(|vars| vars.get(name).and_then(|s| s.parse::<i32>().ok()))
+    }
+}
+
+impl ObjectPump for Config {
+    fn from_data(data: &[u8]) -> anyhow::Result<Self> {
+        let data = String::from_utf8_lossy(data).to_string();
+        Ok(Config::parse(data))
+    }
+    fn from_file(filepath: &str) -> anyhow::Result<Self> {
+        match File::open(filepath) {
+            Ok(mut file) => {
+                let mut contents = Vec::new();
+                file.read_to_end(&mut contents)?;
+
+                Config::from_data(&contents)
+            }
+            Err(why) => Err(anyhow!("Could not open file: {}", why)),
+        }
     }
 }

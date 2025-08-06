@@ -10,6 +10,7 @@ use crate::{
     objects::{
         ObjectDump, ObjectPump,
         blob::Blob,
+        commit::Commit,
         tree::{Object, ObjectType, Tree},
     },
 };
@@ -150,11 +151,30 @@ fn main() {
             ));
         }
 
-        let name = tree.dump_to_file().unwrap();
+        let tree_name = tree.dump_to_file().unwrap();
 
-        let tree = Tree::from_file(&format!(".gilltter/objects/{}", name)).unwrap();
+        let tree = Tree::from_file(&format!(".gilltter/objects/{}", tree_name)).unwrap();
 
         // now build a commit
         // we need tree, parent, user, message in commit
+        let config = Config::from_file(".gilltter/config").unwrap();
+        let username = config.get("Account", "username").unwrap();
+        let email = config.get("Account", "email").unwrap();
+
+        let mut commit = Commit::new();
+        commit.set_tree_sha(tree_name);
+        commit.set_username(username);
+        commit.set_email(email);
+        commit.set_message("fuck niggas");
+
+        let commit_name = commit.dump_to_file().unwrap();
+
+        let commit = Commit::from_file(&format!(".gilltter/objects/{}", commit_name)).unwrap();
+        println!(
+            "'{}' '{}' '{}'",
+            commit.get_email().unwrap(),
+            commit.get_username().unwrap(),
+            commit.get_message().unwrap()
+        );
     }
 }
