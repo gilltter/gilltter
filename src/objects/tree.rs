@@ -8,7 +8,7 @@ use anyhow::anyhow;
 
 use crate::{
     base::{GILLTER_OBJECTS_DIR, GILLTTER_PATH},
-    objects::{self, ObjectDump, ObjectPump, SPACE_STR},
+    objects::{ObjectDump, ObjectPump, SPACE_STR},
     utils,
 };
 
@@ -197,7 +197,7 @@ impl ObjectPump for Tree {
 
 #[cfg(test)]
 mod tests {
-    use crate::objects::blob::Blob;
+    use crate::objects::{self, blob::Blob};
 
     use super::*;
 
