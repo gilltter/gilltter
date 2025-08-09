@@ -22,7 +22,7 @@ mod objects;
 mod utils;
 
 fn gilltter_init() -> anyhow::Result<()> {
-    base::make_sure_gilltter_dir_exists()
+    base::create_gilltter_project()
 }
 
 fn gilltter_add(filepath: &str) -> anyhow::Result<String> {
@@ -43,11 +43,4 @@ fn gilltter_pick_blob(filepath: &str) -> Blob {
 
 fn main() {
     base::create_gilltter_project().unwrap();
-    if let Err(_) = base::does_gilltter_proj_exist() {
-        panic!("Gilltter Project is not initialized");
-    }
-    let args: Vec<String> = std::env::args().map(|arg| arg.to_string()).collect();
-    if &args[1] == "add" {
-        gilltter_add(&args[2]).unwrap();
-    }
 }
