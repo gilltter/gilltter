@@ -34,7 +34,7 @@ pub fn add_one_in_index(filepath: &Path) -> anyhow::Result<()> {
     let mut writer = BufWriter::new(index_file);
     writer.seek(std::io::SeekFrom::Start(start_index as u64))?;
     writer.write_all(
-        format!("{} {} {}\n", utils_sha1, "blob", filepath.to_str().unwrap()).as_bytes(),
+        format!("{} {} {}\n", "blob", filepath.to_str().unwrap(), utils_sha1).as_bytes(),
     )?;
     Ok(())
 }
