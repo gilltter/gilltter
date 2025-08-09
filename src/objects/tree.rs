@@ -13,37 +13,43 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub enum ObjectType {
-    Blob,
-    Tree,
+pub enum FileType {
+    RegularFile,
+    ExecutableFile,
+    SymbolicLink,
+    Directory,
 }
 
 pub const TREE_TYPE_STRING: &'static [u8] = b"tree";
 
-impl ObjectType {
-    fn to_bytes(&self) -> Vec<u8> {
+impl FileType {
+    pub fn to_bytes(&self) -> Vec<u8> {
         match self {
-            Self::Blob => "b".as_bytes().to_owned(),
-            Self::Tree => "t".as_bytes().to_owned(),
+            Self::RegularFile => b"100644".to_vec(),
+            Self::ExecutableFile => b"100755".to_vec(),
+            Self::SymbolicLink => b"120000".to_vec(),
+            Self::Directory => b"040000".to_vec(),
         }
     }
-    fn from_byte(byte: u8) -> Self {
-        match byte {
-            b'b' => Self::Blob,
-            b't' => Self::Tree,
-            _ => panic!("Wtf"),
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        match bytes {
+            b"100644" => Some(Self::RegularFile),
+            b"100755" => Some(Self::ExecutableFile),
+            b"120000" => Some(Self::SymbolicLink),
+            b"040000" => Some(Self::Directory),
+            _ => None,
         }
     }
 }
 
 #[derive(Clone)]
 pub struct Object {
-    pub obj_type: ObjectType,
+    pub obj_type: FileType,
     pub filepath: String,
     pub sha1_pointer: String,
 }
 impl Object {
-    pub fn new(obj_type: ObjectType, filepath: String, sha1_pointer: String) -> Self {
+    pub fn new(obj_type: FileType, filepath: String, sha1_pointer: String) -> Self {
         Self {
             obj_type,
             filepath,
@@ -82,7 +88,7 @@ impl ObjectDump for Tree {
         // Count bytes
         let mut bytes_cnt = 0;
         for (_, value) in self.objects.iter() {
-            bytes_cnt += 1; // 1 byte for file type
+            bytes_cnt += 6; // 6 bytes for file type
             bytes_cnt += 1; // Space after type
             bytes_cnt += value.filepath.len() + 1; // Filepath + 1 for null terminator
             bytes_cnt += 40; // Sha-1 in hex is 40 bytes TODO: Would be good to get rid of magic numbers
@@ -96,6 +102,8 @@ impl ObjectDump for Tree {
                 format!("{}\0{}", value.filepath, value.sha1_pointer).as_bytes(),
             );
         }
+
+        println!("Tree: {}", String::from_utf8_lossy(&bytes));
         bytes
     }
     fn dump_to_file(&self) -> anyhow::Result<String> {
@@ -139,8 +147,9 @@ impl ObjectPump for Tree {
         let mut data = content;
         while !data.is_empty() {
             // Some cycle maybe
-            let obj_type_byte = data[0];
-            let obj_type = ObjectType::from_byte(obj_type_byte);
+            let obj_type_bytes = &data[0..6];
+            let obj_type =
+                FileType::from_bytes(obj_type_bytes).ok_or(anyhow!("Weird file type"))?;
 
             if data.len() <= 2 {
                 return Err(anyhow!("Format error"));
@@ -215,7 +224,7 @@ mod tests {
             index_mock.insert(
                 utils_sha1.clone(),
                 Object::new(
-                    objects::tree::ObjectType::Blob,
+                    objects::tree::FileType::RegularFile,
                     utils_filepath.to_string(),
                     utils_sha1.clone(),
                 ),
@@ -226,7 +235,7 @@ mod tests {
             index_mock.insert(
                 base_sha1.clone(),
                 Object::new(
-                    objects::tree::ObjectType::Blob,
+                    objects::tree::FileType::RegularFile,
                     base_filepath.to_string(),
                     base_sha1.clone(),
                 ),
@@ -237,7 +246,7 @@ mod tests {
 
             for (_, value) in index_mock.into_iter() {
                 tree.add_object(Object::new(
-                    ObjectType::Blob,
+                    FileType::RegularFile,
                     value.filepath,
                     value.sha1_pointer,
                 ));

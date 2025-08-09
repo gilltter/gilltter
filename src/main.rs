@@ -32,6 +32,7 @@ fn gilltter_add(filepath: &str) -> anyhow::Result<String> {
 }
 
 fn main() {
+    gilltter_init().unwrap();
     let mut app = Command::new("gilltter")
         .version("0.1")
         .about("Simple version control system on Rust")

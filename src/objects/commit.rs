@@ -268,7 +268,7 @@ mod tests {
         objects::{
             self,
             blob::Blob,
-            tree::{Object, ObjectType, Tree},
+            tree::{FileType, Object, Tree},
         },
     };
 
@@ -294,7 +294,7 @@ mod tests {
         index_mock.insert(
             utils_sha1.clone(),
             Object::new(
-                objects::tree::ObjectType::Blob,
+                objects::tree::FileType::RegularFile,
                 utils_filepath.to_string(),
                 utils_sha1.clone(),
             ),
@@ -305,7 +305,7 @@ mod tests {
         index_mock.insert(
             base_sha1.clone(),
             Object::new(
-                objects::tree::ObjectType::Blob,
+                objects::tree::FileType::RegularFile,
                 base_filepath.to_string(),
                 base_sha1.clone(),
             ),
@@ -316,7 +316,7 @@ mod tests {
 
         for (_, value) in index_mock.into_iter() {
             tree.add_object(Object::new(
-                ObjectType::Blob,
+                FileType::RegularFile,
                 value.filepath,
                 value.sha1_pointer,
             ));
@@ -329,8 +329,8 @@ mod tests {
         // now build a commit
         // we need tree, parent, user, message in commit
         let config = Config::from_file(".gilltter/config").unwrap();
-        let username = config.get("Account", "username").unwrap();
-        let email = config.get("Account", "email").unwrap();
+        let username = String::from("bitch");
+        let email = String::from("idiot@mgial.com");
 
         let mut commit = Commit::new();
         commit.set_tree_sha(tree_name);
