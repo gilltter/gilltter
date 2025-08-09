@@ -2,6 +2,8 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path;
 
+use anyhow::anyhow;
+
 use crate::utils;
 
 pub const GILLTTER_PATH: &'static str = ".gilltter";
@@ -12,7 +14,7 @@ pub const GILLTER_STATE_FILE: &'static str = "state"; // A.k.a git INDEX file
 pub const GILLTER_BRANCHES_DIR: &'static str = "branches";
 pub const GILLTER_CONFIG_FILE: &'static str = "config";
 
-pub fn make_sure_gilltter_dir_exists() -> anyhow::Result<()> {
+pub fn create_gilltter_project() -> anyhow::Result<()> {
     if !fs::exists(GILLTTER_PATH)?
         || !fs::exists(String::from(GILLTTER_PATH) + utils::get_separator() + GILLTER_OBJECTS_DIR)?
         || !fs::exists(String::from(GILLTTER_PATH) + utils::get_separator() + GILLTER_HEAD_FILE)?
@@ -49,6 +51,19 @@ pub fn make_sure_gilltter_dir_exists() -> anyhow::Result<()> {
             String::from(GILLTTER_PATH) + utils::get_separator() + GILLTER_BRANCHES_DIR,
         );
         fs::create_dir(branches_dir).unwrap_or(());
+    }
+    Ok(())
+}
+
+pub fn does_gilltter_proj_exist() -> anyhow::Result<()> {
+    if !fs::exists(GILLTTER_PATH)?
+        || !fs::exists(String::from(GILLTTER_PATH) + utils::get_separator() + GILLTER_OBJECTS_DIR)?
+        || !fs::exists(String::from(GILLTTER_PATH) + utils::get_separator() + GILLTER_HEAD_FILE)?
+        || !fs::exists(String::from(GILLTTER_PATH) + utils::get_separator() + GILLTER_STATE_FILE)?
+        || !fs::exists(String::from(GILLTTER_PATH) + utils::get_separator() + GILLTER_BRANCHES_DIR)?
+        || !fs::exists(String::from(GILLTTER_PATH) + utils::get_separator() + GILLTER_CONFIG_FILE)?
+    {
+        return Err(anyhow!("Broken"));
     }
     Ok(())
 }
