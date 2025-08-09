@@ -86,20 +86,8 @@ impl ObjectDump for Commit {
         }
         let mut bytes = Vec::new();
 
-        let bytes_cnt = self.tree_sha.as_ref().unwrap().len()
-            + self
-                .parent_commit_sha
-                .as_ref()
-                .unwrap_or(&String::new())
-                .len()
-            + self.username.as_ref().unwrap().len()
-            + self.email.as_ref().unwrap().len()
-            + self.message.as_ref().unwrap_or(&String::new()).len();
-        // panic!("BYTES_CNT INCORRECT"); TODO: FIX
-
         bytes.extend_from_slice(COMMIT_TYPE_STRING);
-        bytes.extend_from_slice(format!(" {}\0", bytes_cnt).as_bytes());
-
+        // bytes.extend_from_slice(format!(" {}\0", bytes_cnt).as_bytes());
         // Tree setup
         bytes.extend_from_slice(format!("tree {}", self.tree_sha.as_ref().unwrap()).as_bytes());
 
@@ -123,6 +111,11 @@ impl ObjectDump for Commit {
 
         // Message
         bytes.extend_from_slice(format!("msg {}", self.message.as_ref().unwrap()).as_bytes());
+
+        let bytes_cnt = bytes.len();
+        let v = bytes.split_off(COMMIT_TYPE_STRING.len());
+        bytes.extend_from_slice(&format!(" {}\0", bytes_cnt).as_bytes());
+        bytes.extend(v.iter());
 
         bytes
     }
@@ -345,6 +338,7 @@ mod tests {
         commit.set_email(email);
         commit.set_message("fuck niggas");
 
+        commit.convert_to_bytes();
         let commit_name = commit.dump_to_file().unwrap();
 
         let commit = Commit::from_file(&format!(".gilltter/objects/{}", commit_name)).unwrap();

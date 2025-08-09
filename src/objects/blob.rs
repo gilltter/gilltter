@@ -85,10 +85,14 @@ impl ObjectPump for Blob {
 impl ObjectDump for Blob {
     fn convert_to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(BLOB_TYPE_STRING);
-        bytes.extend_from_slice(SPACE_STR);
-        bytes.extend_from_slice(&self.content.len().to_string().as_bytes());
-        bytes.extend_from_slice("\0".as_bytes());
+        bytes.extend_from_slice(
+            format!(
+                "{} {}\0",
+                String::from_utf8_lossy(BLOB_TYPE_STRING),
+                self.content.len()
+            )
+            .as_bytes(),
+        );
         bytes.extend_from_slice(&self.content);
         bytes
     }

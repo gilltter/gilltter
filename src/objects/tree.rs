@@ -76,7 +76,7 @@ impl Tree {
 impl ObjectDump for Tree {
     fn convert_to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(TREE_TYPE_STRING); // TODO: Remove hardcoded stuff
+        bytes.extend_from_slice(TREE_TYPE_STRING);
         bytes.extend_from_slice(SPACE_STR);
 
         // Count bytes
@@ -85,7 +85,7 @@ impl ObjectDump for Tree {
             bytes_cnt += 1; // 1 byte for file type
             bytes_cnt += 1; // Space after type
             bytes_cnt += value.filepath.len() + 1; // Filepath + 1 for null terminator
-            bytes_cnt += 40; // Sha-1 in hex is 40 bytes
+            bytes_cnt += 40; // Sha-1 in hex is 40 bytes TODO: Would be good to get rid of magic numbers
         }
         bytes.extend_from_slice(format!("{}\0", bytes_cnt).as_bytes());
 
