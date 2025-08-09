@@ -7,16 +7,7 @@ use std::{
 
 use clap::{Arg, ArgAction, Command};
 
-use crate::{
-    base::{GILLTER_OBJECTS_DIR, GILLTTER_PATH},
-    config::Config,
-    objects::{
-        ObjectDump, ObjectPump,
-        blob::Blob,
-        commit::Commit,
-        tree::{Object, ObjectType, Tree},
-    },
-};
+use crate::objects::{ObjectDump, blob::Blob};
 
 mod base;
 mod config;

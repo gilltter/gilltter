@@ -9,15 +9,11 @@ use std::{
     collections::HashMap,
     fs::File,
     io::{BufRead, BufReader, Cursor, Read},
-    path,
 };
 
 use anyhow::anyhow;
 
-use crate::{
-    base::{GILLTER_CONFIG_FILE, GILLTTER_PATH},
-    objects::ObjectPump,
-};
+use crate::objects::ObjectPump;
 
 pub struct Config {
     variables: HashMap<String, HashMap<String, String>>, // Category -> [<var-name> <var-value, ...]
