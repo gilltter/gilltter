@@ -2,7 +2,10 @@ use std::{
     collections::HashMap,
     fs::File,
     io::{Read, Write},
+    path::Path,
 };
+
+use clap::{Arg, ArgAction, Command};
 
 use crate::{
     base::{GILLTER_OBJECTS_DIR, GILLTTER_PATH},
@@ -37,10 +40,37 @@ fn gilltter_add(filepath: &str) -> anyhow::Result<String> {
     Ok(filename)
 }
 
-fn gilltter_pick_blob(filepath: &str) -> Blob {
-    Blob::from_file(filepath).unwrap()
-}
-
 fn main() {
-    base::create_gilltter_project().unwrap();
+    let mut app = Command::new("gilltter")
+        .version("0.1")
+        .about("Simple version control system on Rust")
+        .subcommand(Command::new("init").about("Initialize gilltter repo"))
+        .subcommand(
+            Command::new("add").about("Adding file to index").args([
+                Arg::new("all")
+                    .short('a')
+                    .long("all")
+                    .action(ArgAction::SetTrue),
+                Arg::new("filename").index(1),
+            ]),
+        );
+
+    let help = app.render_help();
+    let args = app.get_matches();
+    let command = args.subcommand().unwrap();
+
+    match command.0 {
+        "init" => gilltter_init().unwrap(),
+        "add" => {
+            if *command.1.get_one::<bool>("all").unwrap() {
+                println!("add all");
+            } else if let Some(filename) = command.1.get_one::<String>("filename") {
+                println!("add {filename}");
+                index::index::add_one_in_index(Path::new(filename)).unwrap();
+            } else {
+                print!("{help}");
+            }
+        }
+        _ => (), // unreachable
+    }
 }

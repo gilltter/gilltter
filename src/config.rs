@@ -33,8 +33,7 @@ impl Config {
     pub fn parse(data: String) -> Config {
         let mut config = Config::new();
         let mut current_category = String::new();
-        let mut line = String::new();
-        let mut reader = BufReader::new(Cursor::new(data));
+        let reader = BufReader::new(Cursor::new(data));
 
         for line in reader.lines() {
             let line = line.unwrap();

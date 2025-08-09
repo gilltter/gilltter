@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.98"
+clap = "4.5.43"
 crypto = "0.5.1"
 flate2 = "1.1.2"
 libc = "0.2.174"
