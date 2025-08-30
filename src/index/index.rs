@@ -211,7 +211,7 @@ pub fn add_one_in_index(filepath: &Path) -> anyhow::Result<()> {
         eprintln!("Such file already exists, fuck you!");
         return Err(anyhow!("Such file already exists"));
     }
-
+    
     let file_sha1 = gilltter_add(filepath.to_str().unwrap()).unwrap();
     let add_file_metadata = std::fs::metadata(filepath)?;
     let entry: IndexEntry = IndexEntry::new(

@@ -35,7 +35,7 @@ pub const fn get_separator() -> &'static str {
     "\\"
 }
 
-pub fn generate_filename(content: &[u8]) -> String {
+pub fn generate_filename(content: &[u8]) -> String { // uncompressed (raw) bytes
     let mut hasher = Sha1::new();
     hasher.update(content);
     let result = hasher.finalize();
