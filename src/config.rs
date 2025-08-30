@@ -8,7 +8,7 @@
 use std::{
     collections::HashMap,
     fs::File,
-    io::{BufRead, BufReader, Cursor, Read},
+    io::{BufRead, BufReader, Cursor, Read}, path::Path,
 };
 
 use anyhow::anyhow;
@@ -72,7 +72,7 @@ impl ObjectPump for Config {
         let data = String::from_utf8_lossy(data).to_string();
         Ok(Config::parse(data))
     }
-    fn from_file(filepath: &str) -> anyhow::Result<Self> {
+    fn from_file(filepath: &Path) -> anyhow::Result<Self> {
         match File::open(filepath) {
             Ok(mut file) => {
                 let mut contents = Vec::new();

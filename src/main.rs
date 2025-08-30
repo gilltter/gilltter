@@ -1,9 +1,4 @@
-use std::{
-    collections::HashMap,
-    fs::File,
-    io::{Read, Write},
-    path::Path,
-};
+use std::{fs::File, io::Read, path::Path};
 
 use clap::{Arg, ArgAction, Command};
 
@@ -33,7 +28,7 @@ fn gilltter_add(filepath: &str) -> anyhow::Result<String> {
 
 fn main() {
     gilltter_init().unwrap();
-    let mut app = Command::new("gilltter")
+    let mut commands = Command::new("gilltter")
         .version("0.1")
         .about("Simple version control system on Rust")
         .subcommand(Command::new("init").about("Initialize gilltter repo"))
@@ -47,8 +42,8 @@ fn main() {
             ]),
         );
 
-    let help = app.render_help();
-    let args = app.get_matches();
+    let help = commands.render_help();
+    let args = commands.get_matches();
     let command = args.subcommand().unwrap();
 
     match command.0 {
@@ -58,7 +53,9 @@ fn main() {
                 println!("add all");
             } else if let Some(filename) = command.1.get_one::<String>("filename") {
                 println!("add {filename}");
-                index::index::add_one_in_index(Path::new(filename)).unwrap();
+                if let Err(why) = index::index::add_one_in_index(Path::new(filename)) {
+                    eprintln!("Could not add a file '{}', because: {}", filename, why);
+                }
             } else {
                 print!("{help}");
             }

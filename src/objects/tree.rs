@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     fs::File,
-    io::{Read, Write},
+    io::{Read, Write}, path::Path,
 };
 
 use anyhow::anyhow;
@@ -146,7 +146,6 @@ impl ObjectPump for Tree {
 
         let mut data = content;
         while !data.is_empty() {
-            // Some cycle maybe
             let obj_type_bytes = &data[0..6];
             let obj_type =
                 FileType::from_bytes(obj_type_bytes).ok_or(anyhow!("Weird file type"))?;
@@ -179,7 +178,7 @@ impl ObjectPump for Tree {
 
         Ok(tree)
     }
-    fn from_file(filepath: &str) -> anyhow::Result<Self> {
+    fn from_file(filepath: &Path) -> anyhow::Result<Self> {
         match File::open(filepath) {
             Ok(mut file) => {
                 let mut file_contents = Vec::new();
@@ -254,7 +253,7 @@ mod tests {
 
             let name = tree.dump_to_file().unwrap();
 
-            Tree::from_file(&format!(".gilltter/objects/{}", name)).unwrap();
+            Tree::from_file(Path::new(&format!(".gilltter/objects/{}", name))).unwrap();
         }
     }
 }

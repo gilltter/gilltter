@@ -1,6 +1,6 @@
 use std::{
     fs::{self, File},
-    io::{Read, Write},
+    io::{Read, Write}, path::Path,
 };
 
 use anyhow::anyhow;
@@ -35,7 +35,7 @@ impl Blob {
 }
 
 impl ObjectPump for Blob {
-    fn from_file(filepath: &str) -> anyhow::Result<Self> {
+    fn from_file(filepath: &Path) -> anyhow::Result<Self> {
         match fs::File::open(filepath) {
             Ok(mut file) => {
                 let mut file_contents = Vec::new();
@@ -128,6 +128,6 @@ mod tests {
 
         let filename = blob.dump_to_file().unwrap();
         println!("f: {}", filename);
-        let blob = Blob::from_file(&format!(".gilltter/objects/{}", filename)).unwrap();
+        let blob = Blob::from_file(Path::new(&format!(".gilltter/objects/{}", filename))).unwrap();
     }
 }

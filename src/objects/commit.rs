@@ -1,7 +1,7 @@
 use std::{
     fs::File,
     io::{Read, Write},
-    path,
+    path::{self, Path},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -243,7 +243,7 @@ impl ObjectPump for Commit {
 
         Ok(commit)
     }
-    fn from_file(filepath: &str) -> anyhow::Result<Self> {
+    fn from_file(filepath: &Path) -> anyhow::Result<Self> {
         match File::open(filepath) {
             Ok(mut file) => {
                 let mut file_contents = Vec::new();
@@ -324,11 +324,11 @@ mod tests {
 
         let tree_name = tree.dump_to_file().unwrap();
 
-        let tree = Tree::from_file(&format!(".gilltter/objects/{}", tree_name)).unwrap();
+        let tree = Tree::from_file(Path::new(&format!(".gilltter/objects/{}", tree_name))).unwrap();
 
         // now build a commit
         // we need tree, parent, user, message in commit
-        let config = Config::from_file(".gilltter/config").unwrap();
+        let config = Config::from_file(Path::new(".gilltter/config")).unwrap();
         let username = String::from("bitch");
         let email = String::from("idiot@mgial.com");
 
@@ -341,7 +341,7 @@ mod tests {
         commit.convert_to_bytes();
         let commit_name = commit.dump_to_file().unwrap();
 
-        let commit = Commit::from_file(&format!(".gilltter/objects/{}", commit_name)).unwrap();
+        let commit = Commit::from_file(Path::new(&format!(".gilltter/objects/{}", commit_name))).unwrap();
         println!(
             "'{}' '{}' '{}'",
             commit.get_email().unwrap(),

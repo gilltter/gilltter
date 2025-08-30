@@ -1,3 +1,5 @@
+use std::path::{Path, PathBuf};
+
 pub mod blob;
 pub mod commit;
 pub mod tree;
@@ -10,6 +12,6 @@ pub trait ObjectDump {
 }
 
 pub trait ObjectPump: Sized {
-    fn from_file(filepath: &str) -> anyhow::Result<Self>;
+    fn from_file(filepath: &Path) -> anyhow::Result<Self>;
     fn from_data(data: &[u8]) -> anyhow::Result<Self>;
 }
