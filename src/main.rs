@@ -2,7 +2,10 @@ use std::{fs::File, io::Read, path::Path};
 
 use clap::{Arg, ArgAction, Command};
 
-use crate::objects::{ObjectDump, blob::Blob};
+use crate::{
+    index::index::Index,
+    objects::{ObjectDump, ObjectPump, blob::Blob},
+};
 
 mod base;
 mod config;
@@ -62,4 +65,6 @@ fn main() {
         }
         _ => (), // unreachable
     }
+
+    // let index = Index::from_file(Path::new("fddf")).unwrap();
 }

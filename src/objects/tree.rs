@@ -1,7 +1,8 @@
 use std::{
     collections::HashMap,
     fs::File,
-    io::{Read, Write}, path::Path,
+    io::{Read, Write},
+    path::Path,
 };
 
 use anyhow::anyhow;
@@ -59,7 +60,9 @@ impl Object {
 }
 
 pub struct Tree {
-    objects: HashMap<String, Object>,
+    objects: HashMap<String, Object>, // sha1-hash -> Object
+    // TODO: Maybe change sha1-hash -> Object to: file path -> Object, this way i can tree.objects.contains("some_вложенное_tree_name")
+    // or better yet make smth like Enum ( Blob(Blob), Tree(Tree) ), so this way I can add nested trees inside already added tree
 }
 
 impl Tree {

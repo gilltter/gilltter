@@ -341,7 +341,8 @@ mod tests {
         commit.convert_to_bytes();
         let commit_name = commit.dump_to_file().unwrap();
 
-        let commit = Commit::from_file(Path::new(&format!(".gilltter/objects/{}", commit_name))).unwrap();
+        let commit =
+            Commit::from_file(Path::new(&format!(".gilltter/objects/{}", commit_name))).unwrap();
         println!(
             "'{}' '{}' '{}'",
             commit.get_email().unwrap(),

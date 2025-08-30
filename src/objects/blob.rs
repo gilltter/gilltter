@@ -1,6 +1,7 @@
 use std::{
     fs::{self, File},
-    io::{Read, Write}, path::Path,
+    io::{Read, Write},
+    path::Path,
 };
 
 use anyhow::anyhow;

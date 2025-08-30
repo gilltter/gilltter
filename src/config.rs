@@ -8,7 +8,8 @@
 use std::{
     collections::HashMap,
     fs::File,
-    io::{BufRead, BufReader, Cursor, Read}, path::Path,
+    io::{BufRead, BufReader, Cursor, Read},
+    path::Path,
 };
 
 use anyhow::anyhow;
