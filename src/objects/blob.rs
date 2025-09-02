@@ -14,6 +14,7 @@ use crate::{
     utils,
 };
 
+#[derive(Clone)]
 pub struct Blob {
     content: Vec<u8>,
 }

@@ -4,7 +4,7 @@ use crate::{
     objects::{
         ObjectDump, ObjectPump,
         blob::Blob,
-        tree::{FileType, Object, Tree},
+        tree::{FileType, Object, Tree, TreeObject},
     },
     utils,
 };
@@ -18,7 +18,7 @@ use std::{
     str::FromStr,
 };
 
-enum IndexType {
+pub enum IndexType {
     RegularFile,
     SymbolicLink,
 }
@@ -39,13 +39,13 @@ impl IndexType {
     }
 }
 
-struct IndexEntry {
-    index_type: IndexType,
-    ctime: i64,     // metadata last changed time
-    mtime: i64, // file contents last changed time (used for comparing working tree with index, if differs, then file not staged), also used for comparing index file with last commit,
-    file_size: u64, // in bytes
-    filename: PathBuf,
-    sha1_hash: String, // goes last, cuz it is fixed
+pub struct IndexEntry {
+    pub index_type: IndexType,
+    pub ctime: i64,     // metadata last changed time
+    pub mtime: i64, // file contents last changed time (used for comparing working tree with index, if differs, then file not staged), also used for comparing index file with last commit,
+    pub file_size: u64, // in bytes
+    pub filename: PathBuf,
+    pub sha1_hash: String, // goes last, cuz it is fixed
 }
 
 impl IndexEntry {
@@ -95,25 +95,56 @@ impl Index {
         }
     }
 
-    pub fn commit(&self) -> anyhow::Result<String> { // sha1 of root tree
+    pub fn commit(&self) -> anyhow::Result<String> {
         assert!(!self.indices.is_empty());
-        let mut trees = HashMap::<String, Tree>::new();
+
+        let mut base_tree = Tree::new();
 
         for entry in self.indices.iter() {
-            // iter through files
-            // build trees, add blob to the last tree (left to right)
-            // wrap intermediate trees into other trees and then root tree
-            // return root tree hash
+            let name = entry.filename.to_string_lossy().to_string();
+            let paths: Vec<&str> = name.split('/').collect();
 
-            // src/main.rs
-            // src/objs/some.rs
-            // src/objs/two.rs
-            // 1. make src tree then add main.rs to it
-            // 2. entry or insert src tree then add objs to it, add some.rs to objs (как добавить some.rs в objs tree, которое является Object?)
-            // 3. entry or insert src tree, check if objs exists, add two.rs exists
+            if paths.len() == 1 {
+                base_tree.add_object(
+                    paths.first().unwrap(),
+                    TreeObject::Blob(entry.sha1_hash.clone()),
+                );
+                continue;
+            }
+
+            if !base_tree.object_exists(paths.first().unwrap()) {
+                base_tree.add_object(paths.first().unwrap(), TreeObject::Tree(Tree::new()));
+            }
+
+            let mut this_tree: &mut TreeObject =
+                base_tree.get_object_mut(paths.first().unwrap()).unwrap();
+
+            let dirs = &paths[1..paths.len() - 1];
+            for dir in dirs {
+                let next = match this_tree {
+                    TreeObject::Tree(tree) => {
+                        if !tree.object_exists(dir) {
+                            tree.add_object(dir, TreeObject::Tree(Tree::new()));
+                        }
+                        tree.get_object_mut(dir).unwrap()
+                    }
+                    _ => panic!("expected tree, found blob"),
+                };
+                this_tree = next;
+            }
+
+            if let TreeObject::Tree(tree) = this_tree {
+                tree.add_object(
+                    paths.last().unwrap(),
+                    TreeObject::Blob(entry.sha1_hash.clone()),
+                );
+            }
         }
 
-        Ok(String::from("Some hash"))
+        // Create commit object
+
+        let hash = base_tree.dump_to_file()?;
+        Ok(hash)
     }
 }
 
@@ -211,7 +242,7 @@ pub fn add_one_in_index(filepath: &Path) -> anyhow::Result<()> {
         eprintln!("Such file already exists, fuck you!");
         return Err(anyhow!("Such file already exists"));
     }
-    
+
     let file_sha1 = gilltter_add(filepath.to_str().unwrap()).unwrap();
     let add_file_metadata = std::fs::metadata(filepath)?;
     let entry: IndexEntry = IndexEntry::new(

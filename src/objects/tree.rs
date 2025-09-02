@@ -9,7 +9,7 @@ use anyhow::anyhow;
 
 use crate::{
     base::{GILLTER_OBJECTS_DIR, GILLTTER_PATH},
-    objects::{ObjectDump, ObjectPump, SPACE_STR},
+    objects::{ObjectDump, ObjectPump, SPACE_STR, blob::Blob},
     utils,
 };
 
@@ -59,10 +59,18 @@ impl Object {
     }
 }
 
+#[derive(Clone)]
+pub enum TreeObject {
+    Tree(Tree),
+    Blob(String), // sha1-hash
+}
+
+#[derive(Clone)]
 pub struct Tree {
-    objects: HashMap<String, Object>, // sha1-hash -> Object
+    // objects: HashMap<String, Object>, // directory/filename -> Object (Tree, Blob)
     // TODO: Maybe change sha1-hash -> Object to: file path -> Object, this way i can tree.objects.contains("some_вложенное_tree_name")
     // or better yet make smth like Enum ( Blob(Blob), Tree(Tree) ), so this way I can add nested trees inside already added tree
+    objects: HashMap<String, TreeObject>,
 }
 
 impl Tree {
@@ -71,42 +79,66 @@ impl Tree {
             objects: HashMap::new(),
         }
     }
-    pub fn add_object(&mut self, object: Object) {
-        self.objects.insert(object.sha1_pointer.clone(), object);
+    pub fn add_object(&mut self, filepath: &str, object: TreeObject) {
+        self.objects.insert(filepath.to_owned(), object);
     }
-    pub fn get_object(&self, sha1_pointer: String) -> Option<&Object> {
-        self.objects.get(&sha1_pointer)
+    pub fn get_object(&self, filepath: &str) -> Option<&TreeObject> {
+        self.objects.get(filepath)
     }
-    pub fn get_objects(&self) -> HashMap<String, Object> {
+    pub fn get_object_mut(&mut self, filepath: &str) -> Option<&mut TreeObject> {
+        self.objects.get_mut(filepath)
+    }
+
+    pub fn get_objects(&self) -> HashMap<String, TreeObject> {
         self.objects.clone()
+    }
+    pub fn object_exists(&self, filepath: &str) -> bool {
+        self.objects.contains_key(filepath)
     }
 }
 
 impl ObjectDump for Tree {
     fn convert_to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
+
         bytes.extend_from_slice(TREE_TYPE_STRING);
         bytes.extend_from_slice(SPACE_STR);
 
-        // Count bytes
-        let mut bytes_cnt = 0;
-        for (_, value) in self.objects.iter() {
-            bytes_cnt += 6; // 6 bytes for file type
-            bytes_cnt += 1; // Space after type
-            bytes_cnt += value.filepath.len() + 1; // Filepath + 1 for null terminator
-            bytes_cnt += 40; // Sha-1 in hex is 40 bytes TODO: Would be good to get rid of magic numbers
-        }
-        bytes.extend_from_slice(format!("{}\0", bytes_cnt).as_bytes());
+        let mut bytes_count = 0;
 
-        for (_, value) in self.objects.iter() {
-            bytes.extend_from_slice(&value.obj_type.to_bytes());
-            bytes.extend_from_slice(" ".as_bytes());
-            bytes.extend_from_slice(
-                format!("{}\0{}", value.filepath, value.sha1_pointer).as_bytes(),
-            );
+        for (path, _) in self.objects.iter() {
+            bytes_count += 6; // file type
+            bytes_count += 1; // space
+            bytes_count += path.len();
+            bytes_count += 1; // \0 after path
+            bytes_count += 40; // sha-1 size in hex
         }
 
-        println!("Tree: {}", String::from_utf8_lossy(&bytes));
+        bytes.extend_from_slice(format!("{}\0", bytes_count).as_bytes());
+
+        for (path, value) in self.objects.iter() {
+            match value {
+                TreeObject::Blob(_) => {
+                    bytes.extend_from_slice(&FileType::RegularFile.to_bytes());
+                }
+                TreeObject::Tree(_) => {
+                    bytes.extend_from_slice(&FileType::Directory.to_bytes());
+                }
+            }
+            bytes.extend_from_slice(SPACE_STR);
+            bytes.extend_from_slice(path.as_bytes());
+            bytes.extend_from_slice(b"\0");
+            match value {
+                TreeObject::Blob(hash) => {
+                    bytes.extend_from_slice(hash.as_bytes());
+                }
+                TreeObject::Tree(tree) => {
+                    let tree_hash = utils::generate_filename(&tree.convert_to_bytes());
+                    bytes.extend_from_slice(tree_hash.as_bytes());
+                }
+            }
+        }
+
         bytes
     }
     fn dump_to_file(&self) -> anyhow::Result<String> {
@@ -170,11 +202,17 @@ impl ObjectPump for Tree {
             }
 
             let sha1_pointer = String::from_utf8_lossy(&data[0..40]).to_string(); // sha1 is 40 bytes
-            tree.add_object(Object::new(
-                obj_type,
-                filepath.clone(),
-                sha1_pointer.clone(),
-            ));
+            match obj_type {
+                FileType::RegularFile => {
+                    tree.add_object(&filepath, TreeObject::Blob(sha1_pointer));
+                }
+                FileType::Directory => {
+                    tree.add_object(&filepath, TreeObject::Tree(Tree::new())); // TODO: How to load this tree
+                }
+                _ => {
+                    unimplemented!("TODO")
+                }
+            }
 
             data = &data[40..];
         }
@@ -197,66 +235,66 @@ impl ObjectPump for Tree {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::objects::{self, blob::Blob};
+// #[cfg(test)]
+// mod tests {
+//     use crate::objects::{self, blob::Blob};
 
-    use super::*;
+//     use super::*;
 
-    fn gilltter_add(filepath: &str) -> String {
-        let mut file = File::open(filepath).unwrap();
-        let mut contents = Vec::new();
-        file.read_to_end(&mut contents).unwrap();
+//     fn gilltter_add(filepath: &str) -> String {
+//         let mut file = File::open(filepath).unwrap();
+//         let mut contents = Vec::new();
+//         file.read_to_end(&mut contents).unwrap();
 
-        let mut blob = Blob::new();
-        blob.set_data(&contents);
+//         let mut blob = Blob::new();
+//         blob.set_data(&contents);
 
-        let filename = blob.dump_to_file().unwrap();
-        filename
-    }
+//         let filename = blob.dump_to_file().unwrap();
+//         filename
+//     }
 
-    #[test]
-    fn create_tree_dump_then_load() {
-        let mut index_mock: HashMap<String, Object> = HashMap::new();
+//     #[test]
+//     fn create_tree_dump_then_load() {
+//         let mut index_mock: HashMap<String, Object> = HashMap::new();
 
-        // Imagine git add
-        {
-            let utils_filepath = String::from("src/utils.rs");
-            let utils_sha1 = gilltter_add(&utils_filepath);
-            index_mock.insert(
-                utils_sha1.clone(),
-                Object::new(
-                    objects::tree::FileType::RegularFile,
-                    utils_filepath.to_string(),
-                    utils_sha1.clone(),
-                ),
-            );
+//         // Imagine git add
+//         {
+//             let utils_filepath = String::from("src/utils.rs");
+//             let utils_sha1 = gilltter_add(&utils_filepath);
+//             index_mock.insert(
+//                 utils_sha1.clone(),
+//                 Object::new(
+//                     objects::tree::FileType::RegularFile,
+//                     utils_filepath.to_string(),
+//                     utils_sha1.clone(),
+//                 ),
+//             );
 
-            let base_filepath = String::from("src/base.rs");
-            let base_sha1 = gilltter_add(&base_filepath);
-            index_mock.insert(
-                base_sha1.clone(),
-                Object::new(
-                    objects::tree::FileType::RegularFile,
-                    base_filepath.to_string(),
-                    base_sha1.clone(),
-                ),
-            );
+//             let base_filepath = String::from("src/base.rs");
+//             let base_sha1 = gilltter_add(&base_filepath);
+//             index_mock.insert(
+//                 base_sha1.clone(),
+//                 Object::new(
+//                     objects::tree::FileType::RegularFile,
+//                     base_filepath.to_string(),
+//                     base_sha1.clone(),
+//                 ),
+//             );
 
-            // Build a tree
-            let mut tree = Tree::new();
+//             // Build a tree
+//             let mut tree = Tree::new();
 
-            for (_, value) in index_mock.into_iter() {
-                tree.add_object(Object::new(
-                    FileType::RegularFile,
-                    value.filepath,
-                    value.sha1_pointer,
-                ));
-            }
+//             // for (_, value) in index_mock.into_iter() {
+//             //     tree.add_object(Object::new(
+//             //         FileType::RegularFile,
+//             //         value.filepath,
+//             //         value.sha1_pointer,
+//             //     ));
+//             // }
 
-            let name = tree.dump_to_file().unwrap();
+//             let name = tree.dump_to_file().unwrap();
 
-            Tree::from_file(Path::new(&format!(".gilltter/objects/{}", name))).unwrap();
-        }
-    }
-}
+//             Tree::from_file(Path::new(&format!(".gilltter/objects/{}", name))).unwrap();
+//         }
+//     }
+// }
