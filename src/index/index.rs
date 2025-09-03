@@ -1,16 +1,15 @@
 use crate::{
-    base::{GILLTER_CONFIG_FILE, GILLTER_HEAD_FILE, GILLTER_OBJECTS_DIR, GILLTTER_INDEX_FILE, GILLTTER_PATH}, config::Config, gilltter_add, objects::{
-        blob::Blob, commit::Commit, tree::{self, FileType, Object, Tree, TreeObject}, ObjectDump, ObjectPump
-    }, utils
+    base::{GILLTER_CONFIG_FILE, GILLTER_HEAD_FILE, GILLTTER_INDEX_FILE, GILLTTER_PATH}, config::Config, gilltter_add, objects::{
+        commit::Commit, tree::{self, Tree, TreeObject}, ObjectDump, ObjectPump
+    }
 };
 use anyhow::anyhow;
 use std::{
-    collections::HashMap,
     fs::{File, OpenOptions},
-    io::{BufRead, BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write},
+    io::{BufRead, BufReader, Cursor, Read, Seek, SeekFrom, Write},
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
-    str::FromStr, time::{SystemTime, UNIX_EPOCH},
+    str::FromStr,
 };
 
 pub enum IndexType {
@@ -89,12 +88,11 @@ impl Index {
             indices: Vec::new(),
         }
     }
-
+    
     pub fn commit(&self, message: String) -> anyhow::Result<String> {
         assert!(!self.indices.is_empty());
 
         let mut base_tree = Tree::new();
-
         for entry in self.indices.iter() {
             let name = entry.filename.to_string_lossy().to_string();
             let paths: Vec<&str> = name.split('/').collect();
@@ -107,9 +105,10 @@ impl Index {
                 continue;
             }
 
-            if !base_tree.object_exists(paths.first().unwrap()) {
-                base_tree.add_object(paths.first().unwrap(), TreeObject::Tree(Tree::new()));
-            }
+            base_tree.add_object_if_not_exists(paths.first().unwrap(), || { TreeObject::Tree(Tree::new()) });
+            // if !base_tree.object_exists(paths.first().unwrap()) {
+            //     base_tree.add_object(paths.first().unwrap(), TreeObject::Tree(Tree::new()));
+            // }
 
             let mut this_tree: &mut TreeObject =
                 base_tree.get_object_mut(paths.first().unwrap()).unwrap();
@@ -118,9 +117,11 @@ impl Index {
             for dir in dirs {
                 let next = match this_tree {
                     TreeObject::Tree(tree) => {
-                        if !tree.object_exists(dir) {
-                            tree.add_object(dir, TreeObject::Tree(Tree::new()));
-                        }
+
+                        tree.add_object_if_not_exists(dir, || TreeObject::Tree(Tree::new()));
+                        // if !tree.object_exists(dir) {
+                        //     tree.add_object(dir, TreeObject::Tree(Tree::new()));
+                        // }
                         tree.get_object_mut(dir).unwrap()
                     }
                     _ => panic!("expected tree, found blob"),
@@ -167,7 +168,6 @@ impl Index {
             .set_username(username)
             .set_email(email);
         let commit_hash = commit.dump_to_file()?;
-        println!("commit dmped");
 
         // Write latest commit hash to the HEAD file
         head_file.seek(SeekFrom::Start(0))?; // Move cursor to the start of the file
@@ -214,7 +214,7 @@ impl ObjectPump for Index {
                 return Self::from_data(&file_contents);
             }
             Err(why) => {
-                eprintln!("Could not open the file: {}", why);
+                eprintln!("Casdlkasjkljklould not open the file: {}", why);
                 return Err(anyhow!("Could not open the file"));
             }
         }

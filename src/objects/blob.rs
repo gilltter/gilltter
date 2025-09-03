@@ -10,7 +10,7 @@ const BLOB_TYPE_STRING: &'static [u8] = b"blob";
 
 use crate::{
     base::{GILLTER_OBJECTS_DIR, GILLTTER_PATH},
-    objects::{ObjectDump, ObjectPump, SPACE_STR},
+    objects::{ObjectDump, ObjectPump},
     utils,
 };
 
@@ -24,10 +24,12 @@ impl Blob {
         Self { content: vec![] }
     }
 
+    #[allow(dead_code)]
     pub fn get_data(&self) -> Vec<u8> {
         self.content.clone()
     }
 
+    #[allow(dead_code)]
     pub fn append_data(&mut self, data: &[u8]) {
         self.content.extend_from_slice(data);
     }
@@ -130,6 +132,8 @@ mod tests {
 
         let filename = blob.dump_to_file().unwrap();
         println!("f: {}", filename);
+
+        #[allow(unused)]
         let blob = Blob::from_file(Path::new(&format!(".gilltter/objects/{}", filename))).unwrap();
     }
 }

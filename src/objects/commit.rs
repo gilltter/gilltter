@@ -36,11 +36,13 @@ impl Commit {
         }
     }
 
+    #[allow(dead_code)]
     pub fn set_tree_sha(&mut self, sha: impl Into<String>) -> &mut Self {
         self.tree_sha = Some(sha.into());
         self
     }
 
+    #[allow(dead_code)]
     pub fn get_tree_sha(&self) -> Option<String> {
         self.tree_sha.clone()
     }
@@ -50,6 +52,7 @@ impl Commit {
         self
     }
 
+    #[allow(dead_code)]
     pub fn get_parent_commit_sha(&self) -> Option<String> {
         self.parent_commit_sha.clone()
     }
@@ -58,6 +61,8 @@ impl Commit {
         self.username = Some(username.into());
         self
     }
+
+    #[allow(dead_code)]
     pub fn get_username(&self) -> Option<String> {
         self.username.clone()
     }
@@ -66,6 +71,8 @@ impl Commit {
         self.email = Some(email.into());
         self
     }
+
+    #[allow(dead_code)]
     pub fn get_email(&self) -> Option<String> {
         self.email.clone()
     }
@@ -74,6 +81,8 @@ impl Commit {
         self.message = Some(message.into());
         self
     }
+
+    #[allow(dead_code)]
     pub fn get_message(&self) -> Option<String> {
         self.message.clone()
     }
@@ -270,7 +279,7 @@ mod tests {
         objects::{
             self,
             blob::Blob,
-            tree::{FileType, Object, Tree},
+            tree::{Object, Tree, TreeObject},
         },
     };
 
@@ -294,7 +303,7 @@ mod tests {
         let utils_filepath = String::from("src/utils.rs");
         let utils_sha1 = gilltter_add(&utils_filepath);
         index_mock.insert(
-            utils_sha1.clone(),
+            utils_filepath.clone(),
             Object::new(
                 objects::tree::FileType::RegularFile,
                 utils_filepath.to_string(),
@@ -305,7 +314,7 @@ mod tests {
         let base_filepath = String::from("src/base.rs");
         let base_sha1 = gilltter_add(&base_filepath);
         index_mock.insert(
-            base_sha1.clone(),
+            base_filepath.clone(),
             Object::new(
                 objects::tree::FileType::RegularFile,
                 base_filepath.to_string(),
@@ -317,20 +326,19 @@ mod tests {
         let mut tree = Tree::new();
 
         // TODO: Fix
-        // for (_, value) in index_mock.into_iter() {
-        //     tree.add_object(Object::new(
-        //         FileType::RegularFile,
-        //         value.filepath,
-        //         value.sha1_pointer,
-        //     ));
-        // }
+        for (path, value) in index_mock.into_iter() {
+            
+            tree.add_object(&path, TreeObject::Blob(value.sha1_pointer));
+        }
 
         let tree_name = tree.dump_to_file().unwrap();
 
+        #[allow(unused)]
         let tree = Tree::from_file(Path::new(&format!(".gilltter/objects/{}", tree_name))).unwrap();
 
         // now build a commit
         // we need tree, parent, user, message in commit
+        #[allow(unused)]
         let config = Config::from_file(Path::new(".gilltter/config")).unwrap();
         let username = String::from("bitch");
         let email = String::from("idiot@mgial.com");

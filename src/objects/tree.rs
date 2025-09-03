@@ -9,7 +9,7 @@ use anyhow::anyhow;
 
 use crate::{
     base::{GILLTER_OBJECTS_DIR, GILLTTER_PATH},
-    objects::{ObjectDump, ObjectPump, SPACE_STR, blob::Blob},
+    objects::{ObjectDump, ObjectPump, SPACE_STR},
     utils,
 };
 
@@ -44,12 +44,14 @@ impl FileType {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct Object {
     pub obj_type: FileType,
     pub filepath: String,
     pub sha1_pointer: String,
 }
 impl Object {
+    #[allow(dead_code)]
     pub fn new(obj_type: FileType, filepath: String, sha1_pointer: String) -> Self {
         Self {
             obj_type,
@@ -80,6 +82,7 @@ impl Tree {
     }
 
 
+    #[allow(dead_code)]
     pub fn get_hash(&self) -> anyhow::Result<String> {
         if !self.objects.is_empty() {
             return Err(anyhow!("Can't get sha1-hash when tree is not used in load context"))
@@ -97,6 +100,12 @@ impl Tree {
     pub fn add_object(&mut self, filepath: &str, object: TreeObject) {
         self.objects.insert(filepath.to_owned(), object);
     }
+
+    pub fn add_object_if_not_exists<F: FnOnce() -> TreeObject>(&mut self, filepath: &str, object_lambda: F) {
+        self.objects.entry(filepath.to_string()).insert_entry(object_lambda());
+    }
+
+    #[allow(dead_code)]
     pub fn get_object(&self, filepath: &str) -> Option<&TreeObject> {
         self.objects.get(filepath)
     }

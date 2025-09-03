@@ -17,7 +17,7 @@ fn gilltter_init() -> anyhow::Result<()> {
 }
 
 fn gilltter_add(filepath: &str) -> anyhow::Result<String> {
-    let mut file = File::open(filepath)?;
+    let mut file = File::open(filepath).expect("cant ope the file");
     let mut contents = Vec::new();
     file.read_to_end(&mut contents)?;
 
