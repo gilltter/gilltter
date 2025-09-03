@@ -2,7 +2,7 @@
 // config format will be like:
 /*
  * [<Category-name>]
- * <key> = <value> (no space)
+ * <key>=<value> (no space)
  */
 
 use std::{
@@ -27,13 +27,14 @@ impl Config {
         }
     }
 
-    pub fn parse(data: String) -> Config {
+    // TODO: Handle all Config::parse() cases!!, then base.rs
+    pub fn parse(data: String) -> anyhow::Result<Config> {
         let mut config = Config::new();
-        let mut current_category = String::new();
+        let mut current_category = String::from("Unnamed");
         let reader = BufReader::new(Cursor::new(data));
 
         for line in reader.lines() {
-            let line = line.unwrap();
+            let line = line?;
             let line = line.trim();
 
             if line.starts_with('[') && line.ends_with(']') {
@@ -44,10 +45,12 @@ impl Config {
                     let name = &line[0..equal_pos];
                     let value = &line[equal_pos + 1..];
                     config.add(&current_category, name, value);
+                } else {
+                    return Err(anyhow!("Malformed line: {}", line))
                 }
             }
         }
-        config
+        Ok(config)
     }
 
     /// category_name must be CamelCase, name is also CamelCase
@@ -75,7 +78,7 @@ impl Config {
 impl ObjectPump for Config {
     fn from_data(data: &[u8]) -> anyhow::Result<Self> {
         let data = String::from_utf8_lossy(data).to_string();
-        Ok(Config::parse(data))
+        Ok(Config::parse(data)?)
     }
     fn from_file(filepath: &Path) -> anyhow::Result<Self> {
         match File::open(filepath) {

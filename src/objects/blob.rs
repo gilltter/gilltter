@@ -48,8 +48,7 @@ impl ObjectPump for Blob {
                 return Blob::from_data(&file_contents);
             }
             Err(why) => {
-                eprintln!("Could not open the file: {}", why);
-                return Err(anyhow!("Could not open the file"));
+                return Err(anyhow!("Could not open the file {}: {}", filepath.to_string_lossy(), why));
             }
         }
     }
@@ -63,15 +62,15 @@ impl ObjectPump for Blob {
             .ok_or(anyhow!("No null terminator in file"))?;
 
         let header = &file_contents[..null_pos];
-        let content = &file_contents[null_pos + 1..];
-
+        let blob_size: usize = String::from_utf8_lossy(&header[5..null_pos])
+            .parse().map_err(|err| anyhow!("Blob size is not usize: {}", err))?;
         let file_type = &header[0..4];
         if file_type != BLOB_TYPE_STRING {
             return Err(anyhow!("File is not of type blob"));
         }
-        let blob_size: usize = String::from_utf8_lossy(&header[5..null_pos])
-            .parse()
-            .unwrap();
+
+        let content = &file_contents[null_pos + 1..];
+
         if blob_size != content.len() {
             return Err(anyhow!(
                 "Blob size doesn't match actual content size: {} vs {}",
@@ -106,16 +105,12 @@ impl ObjectDump for Blob {
         let filedata = utils::compress(&blob_content)?;
         let filename = utils::generate_filename(&blob_content);
 
-        let path = String::from(GILLTTER_PATH)
-            + utils::get_separator()
-            + GILLTER_OBJECTS_DIR
-            + utils::get_separator()
-            + filename.as_str();
+        let path = Path::new(GILLTTER_PATH).join(GILLTER_OBJECTS_DIR).join(filename.as_str());
         let mut file = File::create(path)?;
         file.write_all(&filedata)?;
         file.flush()?;
         Ok(filename)
-    }
+    } 
 }
 
 #[cfg(test)]

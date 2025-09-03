@@ -1,9 +1,10 @@
-use std::fs;
-use std::io::ErrorKind;
-use std::path;
+use std::fs::{self, File};
+use std::io::{ErrorKind, Read};
+use std::path::Path;
 
-use anyhow::anyhow;
 
+use crate::objects::ObjectDump;
+use crate::objects::blob::Blob;
 use crate::utils;
 
 pub const GILLTTER_PATH: &'static str = ".gilltter";
@@ -28,43 +29,41 @@ pub fn create_gilltter_project() -> anyhow::Result<()> {
                 eprintln!("Could not create Gilltter project directory: {}", why)
             }
         }
-        let objects_dir = path::PathBuf::from(
-            String::from(GILLTTER_PATH) + utils::get_separator() + GILLTER_OBJECTS_DIR,
-        );
+
+        let objects_dir = Path::new(GILLTTER_PATH).join(GILLTER_OBJECTS_DIR);
         fs::create_dir(objects_dir).unwrap_or(()); // At this point we should be allowed to create files/dirs (in terms of permissions)
 
-        let head_file = path::PathBuf::from(
-            String::from(GILLTTER_PATH) + utils::get_separator() + GILLTER_HEAD_FILE,
-        );
+        let head_file = Path::new(GILLTTER_PATH).join(GILLTER_HEAD_FILE);
         if let Err(_) = fs::File::create(head_file) {} // Drops here therefore closing file
 
-        let index_file = path::PathBuf::from(
-            String::from(GILLTTER_PATH) + utils::get_separator() + GILLTER_STATE_FILE,
-        );
+        let idx_file = Path::new(GILLTTER_PATH).join(GILLTTER_INDEX_FILE);
+        if let Err(_) = fs::File::create(idx_file) {} // Drops here therefore closing file
+
+        let index_file = Path::new(GILLTTER_PATH).join(GILLTER_STATE_FILE);
         if let Err(_) = fs::File::create(index_file) {}
 
-        let local_config_file = path::PathBuf::from(
-            String::from(GILLTTER_PATH) + utils::get_separator() + GILLTER_CONFIG_FILE,
-        );
+        let local_config_file = Path::new(GILLTTER_PATH).join(GILLTER_CONFIG_FILE);
         if let Err(_) = fs::File::create(local_config_file) {}
 
-        let branches_dir = path::PathBuf::from(
-            String::from(GILLTTER_PATH) + utils::get_separator() + GILLTER_BRANCHES_DIR,
-        );
+        let branches_dir = Path::new(GILLTTER_PATH).join(GILLTER_BRANCHES_DIR);
         fs::create_dir(branches_dir).unwrap_or(());
     }
     Ok(())
 }
 
-pub fn does_gilltter_proj_exist() -> anyhow::Result<()> {
-    if !fs::exists(GILLTTER_PATH)?
-        || !fs::exists(String::from(GILLTTER_PATH) + utils::get_separator() + GILLTER_OBJECTS_DIR)?
-        || !fs::exists(String::from(GILLTTER_PATH) + utils::get_separator() + GILLTER_HEAD_FILE)?
-        || !fs::exists(String::from(GILLTTER_PATH) + utils::get_separator() + GILLTER_STATE_FILE)?
-        || !fs::exists(String::from(GILLTTER_PATH) + utils::get_separator() + GILLTER_BRANCHES_DIR)?
-        || !fs::exists(String::from(GILLTTER_PATH) + utils::get_separator() + GILLTER_CONFIG_FILE)?
-    {
-        return Err(anyhow!("Broken"));
-    }
-    Ok(())
+
+pub(crate) fn gilltter_init() -> anyhow::Result<()> {
+    create_gilltter_project()
+}
+
+pub(crate) fn gilltter_add(filepath: &Path) -> anyhow::Result<String> {
+    let mut file = File::open(filepath)?;
+    let mut contents = Vec::new();
+    file.read_to_end(&mut contents)?;
+
+    let mut blob = Blob::new();
+    blob.set_data(&contents);
+
+    let sha_hash = blob.dump_to_file()?;
+    Ok(sha_hash)
 }

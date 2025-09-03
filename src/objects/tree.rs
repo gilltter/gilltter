@@ -81,17 +81,20 @@ impl Tree {
         }
     }
 
-
     #[allow(dead_code)]
     pub fn get_hash(&self) -> anyhow::Result<String> {
         if !self.objects.is_empty() {
-            return Err(anyhow!("Can't get sha1-hash when tree is not used in load context"))
+            return Err(anyhow!(
+                "Can't get sha1-hash when tree is not used in load context"
+            ));
         }
         Ok(self.sha1_hash.clone())
     }
     pub fn set_hash(&mut self, sha1_hash: &str) -> anyhow::Result<()> {
         if !self.objects.is_empty() {
-            return Err(anyhow!("Can't set sha1-hash when tree is not used in load context"))
+            return Err(anyhow!(
+                "Can't set sha1-hash when tree is not used in load context"
+            ));
         }
         self.sha1_hash = sha1_hash.to_string();
         Ok(())
@@ -101,8 +104,14 @@ impl Tree {
         self.objects.insert(filepath.to_owned(), object);
     }
 
-    pub fn add_object_if_not_exists<F: FnOnce() -> TreeObject>(&mut self, filepath: &str, object_lambda: F) {
-        self.objects.entry(filepath.to_string()).insert_entry(object_lambda());
+    pub fn add_object_if_not_exists<F: FnOnce() -> TreeObject>(
+        &mut self,
+        filepath: &str,
+        object_lambda: F,
+    ) {
+        self.objects
+            .entry(filepath.to_string())
+            .insert_entry(object_lambda());
     }
 
     #[allow(dead_code)]
@@ -171,11 +180,7 @@ impl ObjectDump for Tree {
         // let filedata = tree_content.clone();
         let filename = utils::generate_filename(&tree_content);
 
-        let path = String::from(GILLTTER_PATH)
-            + utils::get_separator()
-            + GILLTER_OBJECTS_DIR
-            + utils::get_separator()
-            + filename.as_str();
+        let path = Path::new(GILLTTER_PATH).join(GILLTER_OBJECTS_DIR).join(filename.as_str());
         let mut file = File::create(path)?;
         file.write_all(&filedata)?;
         file.flush()?;
@@ -184,10 +189,12 @@ impl ObjectDump for Tree {
 }
 
 pub fn dump_tree_recursive(tree: &Tree) -> anyhow::Result<()> {
-    let base_tree_objects = tree.get_objects();
     tree.dump_to_file()?;
+
+    let base_tree_objects = tree.get_objects();
     for object in base_tree_objects.values() {
-        if let TreeObject::Tree(tree) = object { // Dump all subtrees
+        if let TreeObject::Tree(tree) = object {
+            // Dump all subtrees
             tree.dump_to_file()?;
             dump_tree_recursive(tree)?;
         }
@@ -195,13 +202,10 @@ pub fn dump_tree_recursive(tree: &Tree) -> anyhow::Result<()> {
     Ok(())
 }
 
-
 impl ObjectPump for Tree {
     fn from_data(data: &[u8]) -> anyhow::Result<Self> {
         let mut tree = Tree::new();
         let data = utils::decompress(data)?;
-
-        println!("Tree Data: '{}'", String::from_utf8_lossy(&data));
 
         let null_pos = data
             .iter()
@@ -214,11 +218,13 @@ impl ObjectPump for Tree {
             return Err(anyhow!("Object type is incorrect"));
         }
 
+        // TODO: Incorrectly counted
         let size_tree_bytes = &header[TREE_TYPE_STRING.len() + 1..null_pos];
         let _size_tree: u32 = String::from_utf8_lossy(size_tree_bytes)
             .trim()
             .parse::<u32>()?;
 
+        // may wanna check if data == size tree bytes
         let mut data = content;
         while !data.is_empty() {
             let obj_type_bytes = &data[0..6];

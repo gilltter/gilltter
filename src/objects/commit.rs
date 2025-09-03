@@ -134,14 +134,8 @@ impl ObjectDump for Commit {
         let filedata = utils::compress(&commit_content)?;
         // let filedata = commit_content;
 
-        let path = path::PathBuf::from(
-            String::from(GILLTTER_PATH)
-                + utils::get_separator()
-                + GILLTER_OBJECTS_DIR
-                + utils::get_separator()
-                + filename.as_str(),
-        );
-        println!("Comit path: {:#?} {}", path, filedata.len());
+        let path = Path::new(GILLTTER_PATH).join(GILLTER_OBJECTS_DIR).join(filename.as_str());
+        // println!("Comit path: {:#?} {}", path, filedata.len());
         let mut file = File::create(path)?;
         file.write_all(&filedata)?;
         file.flush()?;
@@ -186,8 +180,7 @@ impl ObjectPump for Commit {
         data = &data[40..];
 
         // get parent
-        let debug_str = String::from_utf8_lossy(data);
-        println!("Parent debug: {}", debug_str);
+        // let debug_str = String::from_utf8_lossy(data);
         let parent_type_str = &data[0.."parent".len()];
         if parent_type_str == b"parent" {
             // its ok, no parent
@@ -197,7 +190,6 @@ impl ObjectPump for Commit {
 
             // Get author
             data = &data[40..];
-            // return Err(anyhow!("Want a parent here fuck u"));
         }
 
         let author_str = &data[0.."author".len()];
@@ -245,7 +237,7 @@ impl ObjectPump for Commit {
             .ok_or(anyhow!("no messag"))?;
         let message_str = &data[0..space_pos];
         if message_str != b"msg" {
-            return Err(anyhow!("Its not a msg"));
+            return Err(anyhow!("Expected msg"));
         }
 
         let actual_messsage = String::from_utf8_lossy(&data[space_pos + 1..]);
@@ -327,7 +319,6 @@ mod tests {
 
         // TODO: Fix
         for (path, value) in index_mock.into_iter() {
-            
             tree.add_object(&path, TreeObject::Blob(value.sha1_pointer));
         }
 

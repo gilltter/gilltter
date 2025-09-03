@@ -1,9 +1,13 @@
-use std::{fs::File, io::Read, path::Path};
+use std::{
+    path::{Path, PathBuf},
+};
 
-use clap::{Arg, ArgAction, Command};
+use clap::{Parser, Subcommand, arg, command};
 
 use crate::{
-    base::{GILLTTER_INDEX_FILE, GILLTTER_PATH}, index::index::Index, objects::{blob::Blob, ObjectDump, ObjectPump}
+    base::{GILLTTER_INDEX_FILE, GILLTTER_PATH},
+    index::index::Index,
+    objects::{ObjectPump},
 };
 
 mod base;
@@ -12,76 +16,70 @@ mod index;
 mod objects;
 mod utils;
 
-fn gilltter_init() -> anyhow::Result<()> {
-    base::create_gilltter_project()
+#[derive(Debug, Parser)] // requires `derive` feature
+#[command(name = "gilltter")]
+#[command(about = "Simple version control system on Rust", long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
 }
 
-fn gilltter_add(filepath: &str) -> anyhow::Result<String> {
-    let mut file = File::open(filepath).expect("cant ope the file");
-    let mut contents = Vec::new();
-    file.read_to_end(&mut contents)?;
+#[derive(Debug, Subcommand)]
+enum Commands {
+    Init {},
 
-    let mut blob = Blob::new();
-    blob.set_data(&contents);
+    #[command(arg_required_else_help = true)]
+    Add {
+        #[command(subcommand)]
+        command: AddCommands,
+    },
 
-    let filename = blob.dump_to_file()?;
-    Ok(filename)
+    #[command(arg_required_else_help = true)]
+    Commit {
+        message: Option<String>,
+    },
+}
+
+#[derive(Subcommand, Debug, Clone)]
+enum AddCommands {
+    All,
+    Filename {
+        #[arg(value_name = "FILE")]
+        file: PathBuf,
+    },
 }
 
 fn main() {
-    gilltter_init().unwrap();
-    let mut commands = Command::new("gilltter")
-        .version("0.1")
-        .about("Simple version control system on Rust")
-        .subcommand(Command::new("init").about("Initialize gilltter repo"))
-        .subcommand(
-            Command::new("add").about("Adding file to index").args([
-                Arg::new("all")
-                    .short('a')
-                    .long("all")
-                    .action(ArgAction::SetTrue),
-                Arg::new("filename").index(1),
-            ]),
-        )
-        .subcommand(Command::new("commit").about("Commiting").args([
-                Arg::new("message")
-                    .short('m')
-                    .long("message")
-                    .num_args(1)
-                    .help("Commit message")
-            ])
-        );
+    base::gilltter_init().unwrap();
 
-    let help = commands.render_help();
-    let args = commands.get_matches();
-    let command = args.subcommand().unwrap();
-
-    match command.0 {
-        "init" => gilltter_init().unwrap(),
-        "add" => {
-            if *command.1.get_one::<bool>("all").unwrap() {
-                println!("add all");
-            } else if let Some(filename) = command.1.get_one::<String>("filename") {
-                println!("add {filename}");
-                if let Err(why) = index::index::add_one_in_index(Path::new(filename)) {
-                    eprintln!("Could not add a file '{}', because: {}", filename, why);
+    let args = Cli::parse();
+    match args.command {
+        Commands::Init {} => base::gilltter_init().unwrap(),
+        Commands::Add { command } => match command {
+            AddCommands::Filename { file } => {
+                if let Err(why) = index::index::add_one_in_index(&file) {
+                    eprintln!(
+                        "Could not add a file '{}', because: {}",
+                        file.to_string_lossy(),
+                        why
+                    );
                 }
-            } else {
-                print!("{help}");
+            }
+            AddCommands::All => {
+                todo!("Add all");
+            }
+        },
+        Commands::Commit { message } => {
+            match Index::from_file(&Path::new(GILLTTER_PATH).join(GILLTTER_INDEX_FILE)) {
+                Ok(index) => {
+                    if let Err(why) = index.commit(message.expect("Type a message")) {
+                        eprintln!("Could not commit: {}", why);
+                    }
+                }
+                Err(why) => {
+                    eprintln!("Could not parse index file: {}", why);
+                }
             }
         }
-        "commit" => {
-            let msg = if let Some(msg) = command.1.get_one::<String>("message") {
-                msg
-            } else {
-                eprintln!("Please, add a message to the commit");
-                return;
-            };
-            let index = Index::from_file(&Path::new(GILLTTER_PATH).join(GILLTTER_INDEX_FILE)).expect("Fuckd");
-            index.commit(msg.to_string()).unwrap();
-        }
-        _ => (), // unreachable
     }
-
-    // let index = Index::from_file(Path::new("fddf")).unwrap();
 }
