@@ -176,6 +176,7 @@ impl ObjectDump for Tree {
 
 pub fn dump_tree_recursive(tree: &Tree) -> anyhow::Result<()> {
     let base_tree_objects = tree.get_objects();
+    tree.dump_to_file()?;
     for object in base_tree_objects.values() {
         if let TreeObject::Tree(tree) = object { // Dump all subtrees
             tree.dump_to_file()?;
