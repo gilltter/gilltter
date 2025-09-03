@@ -3,8 +3,7 @@ use std::{fs::File, io::Read, path::Path};
 use clap::{Arg, ArgAction, Command};
 
 use crate::{
-    index::index::Index,
-    objects::{ObjectDump, ObjectPump, blob::Blob},
+    base::{GILLTTER_INDEX_FILE, GILLTTER_PATH}, index::index::Index, objects::{blob::Blob, ObjectDump, ObjectPump}
 };
 
 mod base;
@@ -43,6 +42,14 @@ fn main() {
                     .action(ArgAction::SetTrue),
                 Arg::new("filename").index(1),
             ]),
+        )
+        .subcommand(Command::new("commit").about("Commiting").args([
+                Arg::new("message")
+                    .short('m')
+                    .long("message")
+                    .num_args(1)
+                    .help("Commit message")
+            ])
         );
 
     let help = commands.render_help();
@@ -62,6 +69,16 @@ fn main() {
             } else {
                 print!("{help}");
             }
+        }
+        "commit" => {
+            let msg = if let Some(msg) = command.1.get_one::<String>("message") {
+                msg
+            } else {
+                eprintln!("Please, add a message to the commit");
+                return;
+            };
+            let index = Index::from_file(&Path::new(GILLTTER_PATH).join(GILLTTER_INDEX_FILE)).expect("Fuckd");
+            index.commit(msg.to_string()).unwrap();
         }
         _ => (), // unreachable
     }

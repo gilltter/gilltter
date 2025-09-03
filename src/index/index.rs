@@ -1,21 +1,16 @@
 use crate::{
-    base::{GILLTER_CONFIG_FILE, GILLTER_OBJECTS_DIR, GILLTTER_PATH},
-    gilltter_add,
-    objects::{
-        ObjectDump, ObjectPump,
-        blob::Blob,
-        tree::{FileType, Object, Tree, TreeObject},
-    },
-    utils,
+    base::{GILLTER_CONFIG_FILE, GILLTER_HEAD_FILE, GILLTER_OBJECTS_DIR, GILLTTER_INDEX_FILE, GILLTTER_PATH}, config::Config, gilltter_add, objects::{
+        blob::Blob, commit::Commit, tree::{self, FileType, Object, Tree, TreeObject}, ObjectDump, ObjectPump
+    }, utils
 };
 use anyhow::anyhow;
 use std::{
     collections::HashMap,
     fs::{File, OpenOptions},
-    io::{BufRead, BufReader, BufWriter, Cursor, Read, Seek, Write},
+    io::{BufRead, BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write},
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
-    str::FromStr,
+    str::FromStr, time::{SystemTime, UNIX_EPOCH},
 };
 
 pub enum IndexType {
@@ -95,7 +90,7 @@ impl Index {
         }
     }
 
-    pub fn commit(&self) -> anyhow::Result<String> {
+    pub fn commit(&self, message: String) -> anyhow::Result<String> {
         assert!(!self.indices.is_empty());
 
         let mut base_tree = Tree::new();
@@ -142,31 +137,47 @@ impl Index {
         }
 
         // Create commit object
+        let config = Config::from_file(&Path::new(GILLTTER_PATH).join(GILLTER_CONFIG_FILE)).expect("Config must be set up");
+        let username = config.get("General", "Username").ok_or(anyhow!("Username should be set in config file"))?;
+        let email = config.get("General", "Email").ok_or(anyhow!("Email should be set in config file"))?;
 
-        let hash = base_tree.dump_to_file()?;
-        Ok(hash)
+
+        let base_tree_hash = base_tree.dump_to_file()?;
+
+      
+        let base_tree_objects = base_tree.get_objects();
+        for object in base_tree_objects.values() {
+            if let TreeObject::Tree(tree) = object { // Dump all subtrees
+                tree::dump_tree_recursive(tree)?;
+            }
+        }
+
+        // open head file containing parent commit
+        let mut head_file = OpenOptions::new().read(true).write(true).open(&Path::new(GILLTTER_PATH).join(GILLTER_HEAD_FILE))?;
+        let mut file_bytes = Vec::new();
+        head_file.read_to_end(&mut file_bytes)?;
+        // Safe to use from_utf8_lossy, since no funny stuff should be in 'head'
+        let parent_commit = String::from_utf8_lossy(&file_bytes); // Empty, if first commit 
+
+        let mut commit = Commit::new();
+        commit
+            .set_tree_sha(base_tree_hash)
+            .set_parent_commit_sha(if !parent_commit.is_empty() { Some(parent_commit.to_string()) } else { None }) 
+            .set_message(message)
+            .set_username(username)
+            .set_email(email);
+        let commit_hash = commit.dump_to_file()?;
+        println!("commit dmped");
+
+        // Write latest commit hash to the HEAD file
+        head_file.seek(SeekFrom::Start(0))?; // Move cursor to the start of the file
+        head_file.write_all(commit_hash.as_bytes())?;
+        head_file.flush()?;
+
+        Ok(commit_hash)
     }
 }
 
-// src/main.rs
-// src/object/tree.rs
-// Parse right to left: 1. main.rs blob in src tree
-// 2. tree.rs blob in object tree, which is in src tree
-// Need to store dir path -> Tree object someow
-
-/* Pseudo code for commit on an index file
-    auto trees = Hashmap<String, Tree>()
-
-    for entry in index.indices {
-        auto filepath = entry.filename
-        auto dirs = filepath.split('/')
-        auto filename = dirs.last(); dirs.remove(dirs.last)
-        trees.insert_if_not_exists(dirs.join(), Tree::new())
-
-        trees[dirs.join()].add_object(filepath)
-    }
-
-*/
 
 impl ObjectPump for Index {
     fn from_data(data: &[u8]) -> anyhow::Result<Self> {
@@ -183,7 +194,6 @@ impl ObjectPump for Index {
             let mtime = elements_vec[2].parse::<i64>()?;
             let file_size = elements_vec[3].parse::<u64>()?;
 
-            // Parse dirs and make trees out of them with blobs
             let filename = PathBuf::from_str(elements_vec[4])?;
 
             let sha1_hash = elements_vec[5].to_owned();
@@ -222,7 +232,7 @@ impl ObjectDump for Index {
     fn dump_to_file(&self) -> anyhow::Result<String> {
         let index_content = self.convert_to_bytes();
 
-        let path = Path::new(GILLTTER_PATH).join(GILLTER_CONFIG_FILE);
+        let path = Path::new(GILLTTER_PATH).join(GILLTTER_INDEX_FILE);
         let mut index_file = OpenOptions::new().write(true).create(true).open(&path)?;
 
         index_file.write_all(&index_content)?;
@@ -232,7 +242,7 @@ impl ObjectDump for Index {
 }
 
 pub fn add_one_in_index(filepath: &Path) -> anyhow::Result<()> {
-    let mut index = Index::from_file(&Path::new(GILLTTER_PATH).join(GILLTER_CONFIG_FILE))?;
+    let mut index = Index::from_file(&Path::new(GILLTTER_PATH).join(GILLTTER_INDEX_FILE))?;
     if index
         .indices
         .iter()

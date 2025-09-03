@@ -49,12 +49,16 @@ impl Config {
         }
         config
     }
+
+    /// category_name must be CamelCase, name is also CamelCase
     pub fn add(&mut self, category_name: &str, name: &str, value: &str) {
         self.variables
             .entry(category_name.to_owned())
             .or_insert(HashMap::new())
             .insert(name.to_owned(), value.to_owned());
     }
+
+    /// This is case sensitive: category_name must be CamelCase, name is also CamelCase
     pub fn get(&self, category_name: &str, name: &str) -> Option<String> {
         if let Some(vars) = self.variables.get(category_name) {
             return vars.get(name).map(|s| s.to_string());

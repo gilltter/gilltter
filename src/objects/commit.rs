@@ -45,8 +45,8 @@ impl Commit {
         self.tree_sha.clone()
     }
 
-    pub fn set_parent_commit_sha(&mut self, sha: impl Into<String>) -> &mut Self {
-        self.parent_commit_sha = Some(sha.into());
+    pub fn set_parent_commit_sha(&mut self, sha: Option<String>) -> &mut Self {
+        self.parent_commit_sha = sha;
         self
     }
 
@@ -122,7 +122,8 @@ impl ObjectDump for Commit {
     fn dump_to_file(&self) -> anyhow::Result<String> {
         let commit_content = self.convert_to_bytes();
         let filename = utils::generate_filename(&commit_content);
-        let filedata = utils::compress(&commit_content)?;
+        // let filedata = utils::compress(&commit_content)?;
+        let filedata = commit_content;
 
         let path = path::PathBuf::from(
             String::from(GILLTTER_PATH)
@@ -131,6 +132,7 @@ impl ObjectDump for Commit {
                 + utils::get_separator()
                 + filename.as_str(),
         );
+        println!("Comit path: {:#?} {}", path, filedata.len());
         let mut file = File::create(path)?;
         file.write_all(&filedata)?;
         file.flush()?;
@@ -182,7 +184,7 @@ impl ObjectPump for Commit {
             // its ok, no parent
             data = &data["parent".len() + 1..];
             let parent_sha = String::from_utf8_lossy(&data[0..40]);
-            commit.set_parent_commit_sha(parent_sha);
+            commit.set_parent_commit_sha(Some(parent_sha.to_string()));
 
             // Get author
             data = &data[40..];

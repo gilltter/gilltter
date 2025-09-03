@@ -67,18 +67,33 @@ pub enum TreeObject {
 
 #[derive(Clone)]
 pub struct Tree {
-    // objects: HashMap<String, Object>, // directory/filename -> Object (Tree, Blob)
-    // TODO: Maybe change sha1-hash -> Object to: file path -> Object, this way i can tree.objects.contains("some_вложенное_tree_name")
-    // or better yet make smth like Enum ( Blob(Blob), Tree(Tree) ), so this way I can add nested trees inside already added tree
-    objects: HashMap<String, TreeObject>,
+    sha1_hash: String, // if it is a loaded object from tree parser, just set this field, kinda stupid, but will work for now
+    objects: HashMap<String, TreeObject>, // path (local) -> Object
 }
 
 impl Tree {
     pub fn new() -> Self {
         Self {
             objects: HashMap::new(),
+            sha1_hash: String::new(),
         }
     }
+
+
+    pub fn get_hash(&self) -> anyhow::Result<String> {
+        if !self.objects.is_empty() {
+            return Err(anyhow!("Can't get sha1-hash when tree is not used in load context"))
+        }
+        Ok(self.sha1_hash.clone())
+    }
+    pub fn set_hash(&mut self, sha1_hash: &str) -> anyhow::Result<()> {
+        if !self.objects.is_empty() {
+            return Err(anyhow!("Can't set sha1-hash when tree is not used in load context"))
+        }
+        self.sha1_hash = sha1_hash.to_string();
+        Ok(())
+    }
+
     pub fn add_object(&mut self, filepath: &str, object: TreeObject) {
         self.objects.insert(filepath.to_owned(), object);
     }
@@ -143,7 +158,8 @@ impl ObjectDump for Tree {
     }
     fn dump_to_file(&self) -> anyhow::Result<String> {
         let tree_content = self.convert_to_bytes();
-        let filedata = utils::compress(&tree_content)?;
+        // let filedata = utils::compress(&tree_content)?;
+        let filedata = tree_content.clone();
         let filename = utils::generate_filename(&tree_content);
 
         let path = String::from(GILLTTER_PATH)
@@ -158,10 +174,24 @@ impl ObjectDump for Tree {
     }
 }
 
+pub fn dump_tree_recursive(tree: &Tree) -> anyhow::Result<()> {
+    let base_tree_objects = tree.get_objects();
+    for object in base_tree_objects.values() {
+        if let TreeObject::Tree(tree) = object { // Dump all subtrees
+            tree.dump_to_file()?;
+            dump_tree_recursive(tree)?;
+        }
+    }
+    Ok(())
+}
+
+
 impl ObjectPump for Tree {
     fn from_data(data: &[u8]) -> anyhow::Result<Self> {
         let mut tree = Tree::new();
         let data = utils::decompress(data)?;
+
+        println!("Tree Data: '{}'", String::from_utf8_lossy(&data));
 
         let null_pos = data
             .iter()
@@ -203,14 +233,13 @@ impl ObjectPump for Tree {
 
             let sha1_pointer = String::from_utf8_lossy(&data[0..40]).to_string(); // sha1 is 40 bytes
             match obj_type {
-                FileType::RegularFile => {
+                FileType::RegularFile | FileType::ExecutableFile | FileType::SymbolicLink => {
                     tree.add_object(&filepath, TreeObject::Blob(sha1_pointer));
                 }
                 FileType::Directory => {
-                    tree.add_object(&filepath, TreeObject::Tree(Tree::new())); // TODO: How to load this tree
-                }
-                _ => {
-                    unimplemented!("TODO")
+                    let mut to_be_loaded_tree = Tree::new();
+                    to_be_loaded_tree.set_hash(&sha1_pointer).unwrap(); // Can't possibly fucking panic
+                    tree.add_object(&filepath, TreeObject::Tree(to_be_loaded_tree)); // TODO: How to load this tree
                 }
             }
 
@@ -235,66 +264,62 @@ impl ObjectPump for Tree {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::objects::{self, blob::Blob};
+#[cfg(test)]
+mod tests {
+    use crate::objects::{self, blob::Blob};
 
-//     use super::*;
+    use super::*;
 
-//     fn gilltter_add(filepath: &str) -> String {
-//         let mut file = File::open(filepath).unwrap();
-//         let mut contents = Vec::new();
-//         file.read_to_end(&mut contents).unwrap();
+    fn gilltter_add(filepath: &str) -> String {
+        let mut file = File::open(filepath).unwrap();
+        let mut contents = Vec::new();
+        file.read_to_end(&mut contents).unwrap();
 
-//         let mut blob = Blob::new();
-//         blob.set_data(&contents);
+        let mut blob = Blob::new();
+        blob.set_data(&contents);
 
-//         let filename = blob.dump_to_file().unwrap();
-//         filename
-//     }
+        let filename = blob.dump_to_file().unwrap();
+        filename
+    }
 
-//     #[test]
-//     fn create_tree_dump_then_load() {
-//         let mut index_mock: HashMap<String, Object> = HashMap::new();
+    #[test]
+    fn create_tree_dump_then_load() {
+        let mut index_mock: HashMap<String, Object> = HashMap::new();
 
-//         // Imagine git add
-//         {
-//             let utils_filepath = String::from("src/utils.rs");
-//             let utils_sha1 = gilltter_add(&utils_filepath);
-//             index_mock.insert(
-//                 utils_sha1.clone(),
-//                 Object::new(
-//                     objects::tree::FileType::RegularFile,
-//                     utils_filepath.to_string(),
-//                     utils_sha1.clone(),
-//                 ),
-//             );
+        // Imagine git add
+        {
+            let utils_filepath = String::from("src/utils.rs");
+            let utils_sha1 = gilltter_add(&utils_filepath);
+            index_mock.insert(
+                utils_filepath.clone(),
+                Object::new(
+                    objects::tree::FileType::RegularFile,
+                    utils_filepath.to_string(),
+                    utils_sha1.clone(),
+                ),
+            );
 
-//             let base_filepath = String::from("src/base.rs");
-//             let base_sha1 = gilltter_add(&base_filepath);
-//             index_mock.insert(
-//                 base_sha1.clone(),
-//                 Object::new(
-//                     objects::tree::FileType::RegularFile,
-//                     base_filepath.to_string(),
-//                     base_sha1.clone(),
-//                 ),
-//             );
+            let base_filepath = String::from("src/base.rs");
+            let base_sha1 = gilltter_add(&base_filepath);
+            index_mock.insert(
+                base_filepath.clone(),
+                Object::new(
+                    objects::tree::FileType::RegularFile,
+                    base_filepath.to_string(),
+                    base_sha1.clone(),
+                ),
+            );
 
-//             // Build a tree
-//             let mut tree = Tree::new();
+            // Build a tree
+            let mut tree = Tree::new();
 
-//             // for (_, value) in index_mock.into_iter() {
-//             //     tree.add_object(Object::new(
-//             //         FileType::RegularFile,
-//             //         value.filepath,
-//             //         value.sha1_pointer,
-//             //     ));
-//             // }
+            for (position, value) in index_mock.into_iter() {
+                tree.add_object(&position, TreeObject::Blob(value.sha1_pointer));
+            }
 
-//             let name = tree.dump_to_file().unwrap();
+            let name = tree.dump_to_file().unwrap();
 
-//             Tree::from_file(Path::new(&format!(".gilltter/objects/{}", name))).unwrap();
-//         }
-//     }
-// }
+            Tree::from_file(Path::new(&format!(".gilltter/objects/{}", name))).unwrap();
+        }
+    }
+}

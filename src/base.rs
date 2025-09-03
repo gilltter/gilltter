@@ -13,6 +13,7 @@ pub const GILLTER_HEAD_FILE: &'static str = "head";
 pub const GILLTER_STATE_FILE: &'static str = "state"; // A.k.a git INDEX file
 pub const GILLTER_BRANCHES_DIR: &'static str = "branches";
 pub const GILLTER_CONFIG_FILE: &'static str = "config";
+pub const GILLTTER_INDEX_FILE: &'static str = "index";
 
 pub fn create_gilltter_project() -> anyhow::Result<()> {
     if !fs::exists(GILLTTER_PATH)?
