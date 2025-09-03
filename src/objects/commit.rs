@@ -122,8 +122,8 @@ impl ObjectDump for Commit {
     fn dump_to_file(&self) -> anyhow::Result<String> {
         let commit_content = self.convert_to_bytes();
         let filename = utils::generate_filename(&commit_content);
-        // let filedata = utils::compress(&commit_content)?;
-        let filedata = commit_content;
+        let filedata = utils::compress(&commit_content)?;
+        // let filedata = commit_content;
 
         let path = path::PathBuf::from(
             String::from(GILLTTER_PATH)

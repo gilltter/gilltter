@@ -158,8 +158,8 @@ impl ObjectDump for Tree {
     }
     fn dump_to_file(&self) -> anyhow::Result<String> {
         let tree_content = self.convert_to_bytes();
-        // let filedata = utils::compress(&tree_content)?;
-        let filedata = tree_content.clone();
+        let filedata = utils::compress(&tree_content)?;
+        // let filedata = tree_content.clone();
         let filename = utils::generate_filename(&tree_content);
 
         let path = String::from(GILLTTER_PATH)
