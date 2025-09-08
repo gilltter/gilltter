@@ -134,7 +134,9 @@ impl ObjectDump for Commit {
         let filedata = utils::compress(&commit_content)?;
         // let filedata = commit_content;
 
-        let path = Path::new(GILLTTER_PATH).join(GILLTER_OBJECTS_DIR).join(filename.as_str());
+        let path = Path::new(GILLTTER_PATH)
+            .join(GILLTER_OBJECTS_DIR)
+            .join(filename.as_str());
         // println!("Comit path: {:#?} {}", path, filedata.len());
         let mut file = File::create(path)?;
         file.write_all(&filedata)?;
