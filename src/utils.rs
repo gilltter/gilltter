@@ -35,7 +35,7 @@ pub const fn get_separator() -> &'static str {
     "\\"
 }
 
-pub fn generate_filename(content: &[u8]) -> String {
+pub fn generate_hash(content: &[u8]) -> String {
     // uncompressed (raw) bytes
     let mut hasher = Sha1::new();
     hasher.update(content);
@@ -43,7 +43,7 @@ pub fn generate_filename(content: &[u8]) -> String {
     let str = format!("{:x}", result);
     str
 }
-
+// penis
 pub fn compress(contents: &[u8]) -> anyhow::Result<Vec<u8>> {
     let mut e = ZlibEncoder::new(Vec::new(), Compression::default());
     e.write_all(contents)?;

@@ -1,9 +1,15 @@
 use std::fs::{self, File};
-use std::io::{ErrorKind, Read};
+use std::io::{ErrorKind, Read, Write};
+use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
 
-use crate::objects::ObjectDump;
+use anyhow::anyhow;
+
+use crate::index::index::{Index, IndexEntry};
+use crate::objects::commit::Commit;
+use crate::objects::tree::Tree;
+use crate::objects::{ObjectDump, ObjectPump};
 use crate::objects::blob::Blob;
 use crate::utils;
 
@@ -66,4 +72,118 @@ pub(crate) fn gilltter_add(filepath: &Path) -> anyhow::Result<String> {
 
     let sha_hash = blob.dump_to_file()?;
     Ok(sha_hash)
+}
+
+fn get_file_contents(path: &Path) -> anyhow::Result<Vec<u8>> {
+    let mut file = std::fs::File::open(path)?;
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)?;
+    let mut blob = Blob::new();
+    blob.set_data(&bytes);
+
+    let bytes = blob.convert_to_bytes();
+    Ok(bytes)
+}
+
+fn traverse_dirs(entries: &mut Vec<IndexEntry>, path: std::path::PathBuf) -> anyhow::Result<()> {
+    let dir = path;
+    let root_path = std::env::current_dir()?;
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let filetype = entry.file_type()?;
+        if filetype.is_file() {
+            let meta = std::fs::metadata(entry.path())?;
+
+            let content = get_file_contents(&entry.path())?;
+            let sha1 = utils::generate_hash(&content);
+
+            entries.push(IndexEntry::new(meta.ctime(), meta.mtime(), meta.size(), crate::index::index::IndexType::RegularFile, entry.path().strip_prefix(&root_path)?.to_path_buf(), sha1));
+        } else if filetype.is_dir() {
+            if entry.file_name() == "target" || entry.file_name() == ".gilltter" || entry.file_name() == ".git" { continue }
+            traverse_dirs(entries, entry.path())?;
+        }
+    }
+    Ok(())
+}
+
+/*
+- Спарсить индекс
+- Спарсить воркинг три
+- Сравнить => (получатся unstaged, untracked файлы)
+- Спарсить хед
+- Сравнить с индексом (work tree) => Получатся staged (index == work tree != head), commited (index == work tree == head)
+*/
+
+
+pub(crate) fn gilltter_status() -> anyhow::Result<()> {
+    // Parse index
+    let index = Index::from_file(&Path::new(GILLTTER_PATH).join(GILLTTER_INDEX_FILE))?;
+    
+    // Parse working tree
+    let mut work_tree_files = Vec::<IndexEntry>::new();
+    let dir = std::env::current_dir()?;
+    traverse_dirs(&mut work_tree_files, dir)?;
+
+    
+
+    // Сначала найдем untracked файлы => untracked файл это значит он есть в ворк три но нет в index
+    let mut untracked_files: Vec<IndexEntry> = Vec::new();
+
+    let mut worktree_to_delete = Vec::new();
+    for (idx, worktree_entry) in work_tree_files.iter().enumerate() {
+        if !index.indices.iter().any(|val| worktree_entry.filename == val.filename) {
+            untracked_files.push(worktree_entry.clone());
+            worktree_to_delete.push(idx);
+        }
+    }
+    for idx in worktree_to_delete.iter().rev() {
+        work_tree_files.remove(*idx);
+    }
+    // for entry in &untracked_files {
+    //     println!("Untracked: {:?}", entry.filename);
+    // }
+    // Untracked готовы
+    
+    // Теперь с оставшимися нужно сделать unstaged
+    let mut unstaged_files: Vec<IndexEntry> = Vec::new();
+    for (_, index_entry) in index.indices.iter().enumerate() {
+        let worktree_entry = work_tree_files.iter().find(|val| val.filename == index_entry.filename);
+        if let Some(worktree_entry) = worktree_entry {
+            if worktree_entry.sha1_hash != index_entry.sha1_hash {
+                unstaged_files.push(worktree_entry.clone());
+            }
+        }
+    }
+    // for entry in &unstaged_files {
+    //     println!("Unstaged: {:?}", entry.filename);
+    // }
+
+    let mut head_file = match std::fs::File::open(Path::new(GILLTTER_PATH).join(GILLTER_HEAD_FILE)) {
+        Ok(file) => file,
+        Err(why) => { // fatal error, head file should always be there
+            eprintln!("Could not open the head file, because: {}", why);
+            return Err(anyhow!(why))
+        }
+    };
+    let mut head_commit_bytes = Vec::new();
+    head_file.read_to_end(&mut head_commit_bytes)?;
+
+    let mut head_files: Vec<IndexEntry> = Vec::new();
+    if !head_commit_bytes.is_empty() {
+        // Нужно пройтись по хеду и добавить файлы в head_file, путь ставить относительно root_path
+        let commit_sha = String::from_utf8_lossy(&head_commit_bytes);
+        let commit = Commit::from_file(&Path::new(GILLTTER_PATH).join(GILLTER_OBJECTS_DIR).join(commit_sha.to_string()))?;
+        
+    } else {
+        
+    }
+    // parent commit is there
+    // Значит, если файл равняется в index и working tree
+    // Но не равняется HEAD => файл staged
+    // И равняется HEAD => файл commited
+
+    // no parent commit, it is a first one
+    // Значит, если файл равняется в index и working tree, значит он staged
+
+    Ok(())
 }

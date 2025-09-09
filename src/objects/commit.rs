@@ -130,9 +130,9 @@ impl ObjectDump for Commit {
     }
     fn dump_to_file(&self) -> anyhow::Result<String> {
         let commit_content = self.convert_to_bytes();
-        let filename = utils::generate_filename(&commit_content);
-        let filedata = utils::compress(&commit_content)?;
-        // let filedata = commit_content;
+        let filename = utils::generate_hash(&commit_content);
+        // let filedata = utils::compress(&commit_content)?;
+        let filedata = commit_content; // TODO: Remove after testing
 
         let path = Path::new(GILLTTER_PATH)
             .join(GILLTER_OBJECTS_DIR)
@@ -150,7 +150,8 @@ impl ObjectPump for Commit {
     // TODO: Range checking
     fn from_data(data: &[u8]) -> anyhow::Result<Self> {
         let mut commit = Commit::new();
-        let data = utils::decompress(data)?;
+        // let data = utils::decompress(data)?;
+        let data = data.to_owned(); // TODO: Remove this after testing
 
         let null_pos = data
             .iter()

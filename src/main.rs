@@ -5,10 +5,11 @@ use std::{
 use clap::{Parser, Subcommand, arg, command};
 
 use crate::{
-    base::{GILLTTER_INDEX_FILE, GILLTTER_PATH},
+    base::{gilltter_status, GILLTTER_INDEX_FILE, GILLTTER_PATH},
     index::index::Index,
-    objects::{ObjectPump},
+    objects::ObjectPump,
 };
+use colored::Colorize;
 
 mod base;
 mod config;
@@ -18,7 +19,7 @@ mod utils;
 
 #[derive(Debug, Parser)] // requires `derive` feature
 #[command(name = "gilltter")]
-#[command(about = "Simple version control system on Rust", long_about = None)]
+#[command(about = "Simple version control system in Rust", long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -50,6 +51,10 @@ enum AddCommands {
 }
 
 fn main() {
+    // gilltter_status().unwrap();
+
+    // return;
+    // println!("Welcome to {}", "Penis".red().bold());
     base::gilltter_init().unwrap();
 
     let args = Cli::parse();
@@ -57,6 +62,7 @@ fn main() {
         Commands::Init {} => base::gilltter_init().unwrap(),
         Commands::Add { command } => match command {
             AddCommands::Filename { file } => {
+                // println!("Adding");
                 if let Err(why) = index::index::add_one_in_index(&file) {
                     eprintln!(
                         "Could not add a file '{}', because: {}",

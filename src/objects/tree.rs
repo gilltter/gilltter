@@ -61,16 +61,16 @@ impl Object {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum TreeObject {
     Tree(Tree),
     Blob(String), // sha1-hash
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Tree {
     sha1_hash: String, // if it is a loaded object from tree parser, just set this field, kinda stupid, but will work for now
-    objects: HashMap<String, TreeObject>, // path (local) -> Object
+    pub objects: HashMap<String, TreeObject>, // path (local) -> Object
 }
 
 impl Tree {
@@ -109,9 +109,10 @@ impl Tree {
         filepath: &str,
         object_lambda: F,
     ) {
+        println!("Tree: {}, exists: {}", filepath, self.objects.contains_key(&filepath.to_string()));
         self.objects
             .entry(filepath.to_string())
-            .insert_entry(object_lambda());
+            .or_insert_with(object_lambda);
     }
 
     #[allow(dead_code)]
@@ -166,7 +167,7 @@ impl ObjectDump for Tree {
                     bytes.extend_from_slice(hash.as_bytes());
                 }
                 TreeObject::Tree(tree) => {
-                    let tree_hash = utils::generate_filename(&tree.convert_to_bytes());
+                    let tree_hash = utils::generate_hash(&tree.convert_to_bytes());
                     bytes.extend_from_slice(tree_hash.as_bytes());
                 }
             }
@@ -176,9 +177,9 @@ impl ObjectDump for Tree {
     }
     fn dump_to_file(&self) -> anyhow::Result<String> {
         let tree_content = self.convert_to_bytes();
-        let filedata = utils::compress(&tree_content)?;
-        // let filedata = tree_content.clone();
-        let filename = utils::generate_filename(&tree_content);
+        // let filedata = utils::compress(&tree_content)?;
+        let filedata = tree_content.clone(); // TODO: Remove this after testing
+        let filename = utils::generate_hash(&tree_content);
 
         let path = Path::new(GILLTTER_PATH).join(GILLTER_OBJECTS_DIR).join(filename.as_str());
         let mut file = File::create(path)?;
@@ -205,7 +206,8 @@ pub fn dump_tree_recursive(tree: &Tree) -> anyhow::Result<()> {
 impl ObjectPump for Tree {
     fn from_data(data: &[u8]) -> anyhow::Result<Self> {
         let mut tree = Tree::new();
-        let data = utils::decompress(data)?;
+        // let data = utils::decompress(data)?;
+        let data = data.to_owned(); // TODO: Remove after testing
 
         let null_pos = data
             .iter()

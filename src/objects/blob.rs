@@ -54,7 +54,8 @@ impl ObjectPump for Blob {
     }
 
     fn from_data(data: &[u8]) -> anyhow::Result<Self> {
-        let file_contents = utils::decompress(&data)?;
+        // let file_contents = utils::decompress(&data)?;
+        let file_contents = data.to_owned(); // TODO: Remove after testing
 
         let null_pos = file_contents
             .iter()
@@ -102,8 +103,9 @@ impl ObjectDump for Blob {
 
     fn dump_to_file(&self) -> anyhow::Result<String> {
         let blob_content = self.convert_to_bytes();
-        let filedata = utils::compress(&blob_content)?;
-        let filename = utils::generate_filename(&blob_content);
+        // let filedata = utils::compress(&blob_content)?;
+        let filedata = blob_content.clone(); // TODO: Remove after testing
+        let filename = utils::generate_hash(&blob_content);
 
         let path = Path::new(GILLTTER_PATH).join(GILLTER_OBJECTS_DIR).join(filename.as_str());
         let mut file = File::create(path)?;
