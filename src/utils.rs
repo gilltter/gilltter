@@ -3,6 +3,7 @@ use std::io::{Read, Write};
 use flate2::{Compression, read::ZlibDecoder, write::ZlibEncoder};
 use sha1::{Digest, Sha1};
 
+#[allow(dead_code)]
 #[cfg(target_os = "linux")]
 pub fn get_file_info(path: &str) -> libc::stat {
     println!("Path: {}", path);
@@ -44,6 +45,7 @@ pub fn generate_hash(content: &[u8]) -> String {
     str
 }
 // penis
+#[allow(dead_code)]
 pub fn compress(contents: &[u8]) -> anyhow::Result<Vec<u8>> {
     let mut e = ZlibEncoder::new(Vec::new(), Compression::default());
     e.write_all(contents)?;

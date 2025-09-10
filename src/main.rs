@@ -5,11 +5,10 @@ use std::{
 use clap::{Parser, Subcommand, arg, command};
 
 use crate::{
-    base::{gilltter_status, GILLTTER_INDEX_FILE, GILLTTER_PATH},
+    base::{GILLTTER_INDEX_FILE, GILLTTER_PATH},
     index::index::Index,
     objects::ObjectPump,
 };
-use colored::Colorize;
 
 mod base;
 mod config;

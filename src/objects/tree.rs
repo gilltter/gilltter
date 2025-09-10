@@ -204,11 +204,8 @@ pub fn dump_tree_recursive(tree: &Tree) -> anyhow::Result<()> {
 }
 
 impl ObjectPump for Tree {
-    fn from_data(data: &[u8]) -> anyhow::Result<Self> {
+    fn from_raw_data(data: &[u8]) -> anyhow::Result<Self> {
         let mut tree = Tree::new();
-        // let data = utils::decompress(data)?;
-        let data = data.to_owned(); // TODO: Remove after testing
-
         let null_pos = data
             .iter()
             .position(|element| *element == "\0".as_bytes()[0])
@@ -272,7 +269,8 @@ impl ObjectPump for Tree {
                 let mut file_contents = Vec::new();
                 file.read_to_end(&mut file_contents)?;
 
-                return Tree::from_data(&file_contents);
+                let data = utils::decompress(&file_contents)?;
+                return Tree::from_raw_data(&data);
             }
             Err(why) => {
                 eprintln!("Could not open the file: {}", why);

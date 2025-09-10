@@ -13,5 +13,5 @@ pub trait ObjectDump {
 
 pub trait ObjectPump: Sized {
     fn from_file(filepath: &Path) -> anyhow::Result<Self>;
-    fn from_data(data: &[u8]) -> anyhow::Result<Self>; // raw uncompressed data
+    fn from_raw_data(data: &[u8]) -> anyhow::Result<Self>; // raw uncompressed data
 }

@@ -45,7 +45,8 @@ impl ObjectPump for Blob {
                 let mut file_contents = Vec::new();
                 file.read_to_end(&mut file_contents)?;
 
-                return Blob::from_data(&file_contents);
+                let data = utils::decompress(&file_contents)?;
+                return Blob::from_raw_data(&data);
             }
             Err(why) => {
                 return Err(anyhow!("Could not open the file {}: {}", filepath.to_string_lossy(), why));
@@ -53,8 +54,7 @@ impl ObjectPump for Blob {
         }
     }
 
-    fn from_data(data: &[u8]) -> anyhow::Result<Self> {
-        // let file_contents = utils::decompress(&data)?;
+    fn from_raw_data(data: &[u8]) -> anyhow::Result<Self> {
         let file_contents = data.to_owned(); // TODO: Remove after testing
 
         let null_pos = file_contents

@@ -109,16 +109,14 @@ impl Index {
 
     pub fn commit(&self, message: String) -> anyhow::Result<String> {
         assert!(!self.indices.is_empty());
-        
-
         let mut base_tree = Tree::new();
         // Create a base tree, which all other objects are added to
 
         for entry in self.indices.iter() {
-            // println!("Entry: {:?}", entry.filename);
             let name = entry.filename.to_string_lossy().to_string();
             let paths: Vec<&str> = name.split('/').collect();
 
+            // If it is only a file in a root dir, just add it...
             if paths.len() == 1 {
                 base_tree.add_object(
                     paths.first().unwrap(),
@@ -127,17 +125,19 @@ impl Index {
                 continue;
             }
 
+            // Make sure src tree exists
             base_tree
                 .add_object_if_not_exists(paths.first().unwrap(), || { 
                     println!("Tree name: '{}'", paths.first().unwrap());
                     TreeObject::Tree(Tree::new()) 
             });
             
-            // println!("Base tree: {:#?}", base_tree);
+            // Current reference to tree so we can like traverse it
             let mut this_tree: &mut TreeObject =
                 base_tree.get_object_mut(paths.first().unwrap()).unwrap();
 
-            let dirs = &paths[1..paths.len() - 1];
+            let dirs = &paths[1..paths.len() - 1]; 
+            // Iterate until 1 before last, because the last one is a file
             for dir in dirs {
                 let next = match this_tree {
                     TreeObject::Tree(tree) => {
@@ -213,9 +213,7 @@ impl Index {
 }
 
 impl ObjectPump for Index {
-    fn from_data(data: &[u8]) -> anyhow::Result<Self> {
-        // let data = utils::decompress(data)?;
-        let data = data.to_owned(); // TODO: Remove after testing
+    fn from_raw_data(data: &[u8]) -> anyhow::Result<Self> {
         let mut index = Index::new();
 
         let reader = BufReader::new(Cursor::new(data));
@@ -244,7 +242,8 @@ impl ObjectPump for Index {
                 let mut file_contents = Vec::new();
                 file.read_to_end(&mut file_contents)?;
 
-                return Self::from_data(&file_contents);
+                let data = utils::decompress(&file_contents)?;
+                return Self::from_raw_data(&data);
             }
             Err(why) => {
                 return Err(anyhow!("Could not open '{}': {}", filepath.to_string_lossy(), why));

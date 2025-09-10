@@ -148,10 +148,8 @@ impl ObjectDump for Commit {
 
 impl ObjectPump for Commit {
     // TODO: Range checking
-    fn from_data(data: &[u8]) -> anyhow::Result<Self> {
+    fn from_raw_data(data: &[u8]) -> anyhow::Result<Self> {
         let mut commit = Commit::new();
-        // let data = utils::decompress(data)?;
-        let data = data.to_owned(); // TODO: Remove this after testing
 
         let null_pos = data
             .iter()
@@ -255,7 +253,8 @@ impl ObjectPump for Commit {
                 let mut file_contents = Vec::new();
                 file.read_to_end(&mut file_contents)?;
 
-                return Commit::from_data(&file_contents);
+                let data = utils::decompress(&file_contents)?;
+                return Commit::from_raw_data(&data);
             }
             Err(why) => {
                 eprintln!("Could not open the file: {}", why);

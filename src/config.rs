@@ -76,7 +76,7 @@ impl Config {
 }
 
 impl ObjectPump for Config {
-    fn from_data(data: &[u8]) -> anyhow::Result<Self> {
+    fn from_raw_data(data: &[u8]) -> anyhow::Result<Self> {
         let data = String::from_utf8_lossy(data).to_string();
         Ok(Config::parse(data)?)
     }
@@ -86,7 +86,7 @@ impl ObjectPump for Config {
                 let mut contents = Vec::new();
                 file.read_to_end(&mut contents)?;
 
-                Config::from_data(&contents)
+                Config::from_raw_data(&contents)
             }
             Err(why) => Err(anyhow!("Could not open file: {}", why)),
         }
