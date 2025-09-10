@@ -109,8 +109,11 @@ impl Index {
 
     pub fn commit(&self, message: String) -> anyhow::Result<String> {
         assert!(!self.indices.is_empty());
+        
 
         let mut base_tree = Tree::new();
+        // Create a base tree, which all other objects are added to
+
         for entry in self.indices.iter() {
             // println!("Entry: {:?}", entry.filename);
             let name = entry.filename.to_string_lossy().to_string();
