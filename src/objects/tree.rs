@@ -225,19 +225,18 @@ impl ObjectPump for Tree {
         // may wanna check if data == size tree bytes
         let mut data = content;
         while !data.is_empty() {
+            // Extract file type
             let obj_type_bytes = &data[0..6];
             let obj_type =
                 FileType::from_bytes(obj_type_bytes).ok_or(anyhow!("Weird file type"))?;
-
-            if data.len() <= 2 {
-                return Err(anyhow!("Format error"));
-            }
-            data = &data[2..];
+            
+            // Move to filename
+            data = &data[7..]; 
+            
             let null_pos = data
                 .iter()
                 .position(|element| *element == *"\0".as_bytes().first().unwrap())
                 .ok_or(anyhow!("No null terminator in file"))?;
-
             let filepath = String::from_utf8_lossy(&data[0..null_pos]).to_string();
 
             data = &data[null_pos + 1..]; // We skipped \0 now we at sha1

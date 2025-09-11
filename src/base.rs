@@ -1,14 +1,14 @@
 use std::fs::{self, File};
 use std::io::{ErrorKind, Read, Write};
 use std::os::unix::fs::MetadataExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 
 use anyhow::anyhow;
 
-use crate::index::index::{Index, IndexEntry};
+use crate::index::index::{Index, IndexEntry, IndexType};
 use crate::objects::commit::Commit;
-use crate::objects::tree::Tree;
+use crate::objects::tree::{Tree, TreeObject};
 use crate::objects::{ObjectDump, ObjectPump};
 use crate::objects::blob::Blob;
 use crate::utils;
@@ -173,10 +173,33 @@ pub(crate) fn gilltter_status() -> anyhow::Result<()> {
         // Нужно пройтись по хеду и добавить файлы в head_file, путь ставить относительно root_path
         let commit_sha = String::from_utf8_lossy(&head_commit_bytes);
         let commit = Commit::from_file(&Path::new(GILLTTER_PATH).join(GILLTER_OBJECTS_DIR).join(commit_sha.to_string()))?;
-        
-    } else {
-        
+
+        // Get a tree
+        // println!("commit: {}", String::from_utf8_lossy(&commit.convert_to_bytes()));
+        let tree_hash = commit.get_tree_sha().expect("Should've had a tree hash inside");
+
+        // Then traverse trees and add them to trees
+        let mut current_path = PathBuf::new(); // Track current path, empty = base tree, commit always points to a base tree
+        let base_tree = Tree::from_file(&Path::new(GILLTTER_PATH).join(GILLTER_OBJECTS_DIR).join(&tree_hash)).expect("How the fuck there is no such tree");
+        traverse_head_tree(&mut head_files, &mut current_path, &base_tree); // traverse from head untiil the end
+
+        println!("Head files: {:#?}", head_files);
     }
+
+    if !head_files.is_empty() {
+        // One way of figuring out tracked, untracked, staged, unstaged files
+    } else {
+        // Other way of doing the same thing
+        // F.e: head exists: if index_file == worktree and != head => staged, not commited
+        // if index-file == work tree == head => commited
+        // if index-file != work tree => unstaged
+
+        // head doesnt exist
+        // ir index_file == worktree and head doesn't exist, all files are staged
+        // if index_file != worktree => unstaged
+        // if work tree fle doesnt exist in index fie => untracked
+    }
+
     // parent commit is there
     // Значит, если файл равняется в index и working tree
     // Но не равняется HEAD => файл staged
@@ -186,4 +209,16 @@ pub(crate) fn gilltter_status() -> anyhow::Result<()> {
     // Значит, если файл равняется в index и working tree, значит он staged
 
     Ok(())
+}
+
+fn traverse_head_tree(head_files: &mut Vec<IndexEntry>, current_path: &mut PathBuf, tree: &Tree) {
+    let tree_objects = tree.get_objects();
+    for (path, object) in &tree_objects {
+        if let TreeObject::Blob(blob_hash) = object {
+            head_files.push(IndexEntry::new(0, 0, 0, IndexType::RegularFile, current_path.join(path), blob_hash.to_string()));
+        } else if let TreeObject::Tree(tree) = object {
+            let tree = Tree::from_file(&Path::new(GILLTTER_PATH).join(GILLTER_OBJECTS_DIR).join(tree.get_hash().unwrap())).expect("How the fuck there is no such tree");
+            traverse_head_tree(head_files, &mut current_path.join(path), &tree);
+        }
+    }
 }

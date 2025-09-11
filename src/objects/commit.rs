@@ -37,7 +37,7 @@ impl Commit {
     }
 
     #[allow(dead_code)]
-    pub fn set_tree_sha(&mut self, sha: impl Into<String>) -> &mut Self {
+    pub fn set_tree_sha(&mut self, sha: String) -> &mut Self {
         self.tree_sha = Some(sha.into());
         self
     }
@@ -169,14 +169,17 @@ impl ObjectPump for Commit {
         let mut data = content;
 
         // Get treee
+       
         let tree_type_str = &data[0..TREE_TYPE_STRING.len()];
+        
         if tree_type_str != TREE_TYPE_STRING {
-            return Err(anyhow!("Want a tree here fuck you"));
+            return Err(anyhow!("Want a tree here"));
         }
 
         data = &data[TREE_TYPE_STRING.len() + 1..]; // start at tree [p]dsadsasa7727 < here
+        
         let tree_sha = String::from_utf8_lossy(&data[0..40]);
-        commit.set_tree_sha(tree_sha);
+        commit.set_tree_sha(tree_sha.to_string());
 
         data = &data[40..];
 
