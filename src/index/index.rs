@@ -240,9 +240,10 @@ impl ObjectPump for Index {
         match File::open(filepath) {
             Ok(mut file) => {
                 let mut file_contents = Vec::new();
-                file.read_to_end(&mut file_contents)?;
+                file.read_to_end(&mut file_contents).unwrap();
 
-                let data = utils::decompress(&file_contents)?;
+                // let data = utils::decompress(&file_contents)?;
+                let data = file_contents;
                 return Self::from_raw_data(&data);
             }
             Err(why) => {
@@ -276,7 +277,7 @@ impl ObjectDump for Index {
 
 pub fn add_one_in_index(filepath: &Path) -> anyhow::Result<()> {
     
-    let mut index = Index::from_file(&Path::new(GILLTTER_PATH).join(GILLTTER_INDEX_FILE)).unwrap();
+    let mut index = Index::from_file(&Path::new(GILLTTER_PATH).join(GILLTTER_INDEX_FILE)).expect("Config fucked up");
     // if index
     //     .indices
     //     .iter()

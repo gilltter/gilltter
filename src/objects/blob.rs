@@ -45,7 +45,8 @@ impl ObjectPump for Blob {
                 let mut file_contents = Vec::new();
                 file.read_to_end(&mut file_contents)?;
 
-                let data = utils::decompress(&file_contents)?;
+                // let data = utils::decompress(&file_contents)?;
+                let data = file_contents;
                 return Blob::from_raw_data(&data);
             }
             Err(why) => {

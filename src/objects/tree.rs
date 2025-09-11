@@ -109,7 +109,6 @@ impl Tree {
         filepath: &str,
         object_lambda: F,
     ) {
-        println!("Tree: {}, exists: {}", filepath, self.objects.contains_key(&filepath.to_string()));
         self.objects
             .entry(filepath.to_string())
             .or_insert_with(object_lambda);
@@ -269,7 +268,8 @@ impl ObjectPump for Tree {
                 let mut file_contents = Vec::new();
                 file.read_to_end(&mut file_contents)?;
 
-                let data = utils::decompress(&file_contents)?;
+                // let data = utils::decompress(&file_contents)?; // TODO: corrupt deflate stream if empty 
+                let data = file_contents;
                 return Tree::from_raw_data(&data);
             }
             Err(why) => {
