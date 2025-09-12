@@ -276,13 +276,6 @@ pub(crate) fn gilltter_status() -> anyhow::Result<()> {
         println!("{}: {:?}", "Staged:".green(), entry.filename);
     }
     println!("=========");
-
-    // println!("========");
-    // for entry in &commited_files {
-    //     println!("{}: {:?}", "Commited:".blue(), entry.filename);
-    // }
-    // println!("=========");
-
     Ok(())
 }
 
