@@ -1,6 +1,4 @@
-use std::{
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use clap::{Parser, Subcommand, arg, command};
 
@@ -38,6 +36,8 @@ enum Commands {
     Commit {
         message: Option<String>,
     },
+
+    Status,
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -50,41 +50,43 @@ enum AddCommands {
 }
 
 fn main() {
-    base::gilltter_status().unwrap();
+    // base::gilltter_status().unwrap();
 
     // return;
     // println!("Welcome to {}", "Penis".red().bold());
-    base::gilltter_init().unwrap();
 
-    // let args = Cli::parse();
-    // match args.command {
-    //     Commands::Init {} => base::gilltter_init().unwrap(),
-    //     Commands::Add { command } => match command {
-    //         AddCommands::Filename { file } => {
-    //             // println!("Adding");
-    //             if let Err(why) = index::index::add_one_in_index(&file) {
-    //                 eprintln!(
-    //                     "Could not add a file '{}', because: {}",
-    //                     file.to_string_lossy(),
-    //                     why
-    //                 );
-    //             }
-    //         }
-    //         AddCommands::All => {
-    //             todo!("Add all");
-    //         }
-    //     },
-    //     Commands::Commit { message } => {
-    //         match Index::from_file(&Path::new(GILLTTER_PATH).join(GILLTTER_INDEX_FILE)) {
-    //             Ok(index) => {
-    //                 if let Err(why) = index.commit(message.expect("Type a message")) {
-    //                     eprintln!("Could not commit: {}", why);
-    //                 }
-    //             }
-    //             Err(why) => {
-    //                 eprintln!("Could not parse index file: {}", why);
-    //             }
-    //         }
-    //     }
-    // }
+    let args = Cli::parse();
+    match args.command {
+        Commands::Init {} => base::gilltter_init().unwrap(),
+        Commands::Add { command } => match command {
+            AddCommands::Filename { file } => {
+                // println!("Adding");
+                if let Err(why) = index::index::add_one_in_index(&file) {
+                    eprintln!(
+                        "Could not add a file '{}', because: {}",
+                        file.to_string_lossy(),
+                        why
+                    );
+                }
+            }
+            AddCommands::All => {
+                todo!("Add all");
+            }
+        },
+        Commands::Commit { message } => {
+            match Index::from_file(&Path::new(GILLTTER_PATH).join(GILLTTER_INDEX_FILE)) {
+                Ok(index) => {
+                    if let Err(why) = index.commit(message.expect("Type a message")) {
+                        eprintln!("Could not commit: {}", why);
+                    }
+                }
+                Err(why) => {
+                    eprintln!("Could not parse index file: {}", why);
+                }
+            }
+        }
+        Commands::Status => {
+            base::gilltter_status().unwrap();
+        }
+    }
 }

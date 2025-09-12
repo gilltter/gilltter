@@ -277,11 +277,11 @@ pub(crate) fn gilltter_status() -> anyhow::Result<()> {
     }
     println!("=========");
 
-    println!("========");
-    for entry in &commited_files {
-        println!("{}: {:?}", "Commited:".blue(), entry.filename);
-    }
-    println!("=========");
+    // println!("========");
+    // for entry in &commited_files {
+    //     println!("{}: {:?}", "Commited:".blue(), entry.filename);
+    // }
+    // println!("=========");
 
     Ok(())
 }
