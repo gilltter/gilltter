@@ -2,8 +2,11 @@ use crate::{
     base::{self, GILLTER_CONFIG_FILE, GILLTER_HEAD_FILE, GILLTTER_INDEX_FILE, GILLTTER_PATH},
     config::Config,
     objects::{
-        commit::Commit, tree::{self, Tree, TreeObject}, ObjectDump, ObjectPump
-    }, utils,
+        ObjectDump, ObjectPump,
+        commit::Commit,
+        tree::{self, Tree, TreeObject},
+    },
+    utils,
 };
 use anyhow::anyhow;
 use std::{
@@ -99,10 +102,13 @@ impl Index {
     }
 
     pub fn remove(&mut self, filepath: &Path) -> bool {
-        let pos = self.indices.iter().position(|val| val.filename.as_path() == Path::new(filepath));
+        let pos = self
+            .indices
+            .iter()
+            .position(|val| val.filename.as_path() == Path::new(filepath));
         if let Some(pos) = pos {
             self.indices.remove(pos);
-            return true
+            return true;
         }
         false
     }
@@ -126,17 +132,16 @@ impl Index {
             }
 
             // Make sure src tree exists
-            base_tree
-                .add_object_if_not_exists(paths.first().unwrap(), || { 
-                    println!("Tree name: '{}'", paths.first().unwrap());
-                    TreeObject::Tree(Tree::new()) 
+            base_tree.add_object_if_not_exists(paths.first().unwrap(), || {
+                println!("Tree name: '{}'", paths.first().unwrap());
+                TreeObject::Tree(Tree::new())
             });
-            
+
             // Current reference to tree so we can like traverse it
             let mut this_tree: &mut TreeObject =
                 base_tree.get_object_mut(paths.first().unwrap()).unwrap();
 
-            let dirs = &paths[1..paths.len() - 1]; 
+            let dirs = &paths[1..paths.len() - 1];
             // Iterate until 1 before last, because the last one is a file
             for dir in dirs {
                 let next = match this_tree {
@@ -149,16 +154,13 @@ impl Index {
                 this_tree = next;
             }
 
-            
             if let TreeObject::Tree(tree) = this_tree {
                 // println!("Dirs: {:?}, Tree: {:#?}, file: {}, exists: {}", dirs, tree.objects, paths.last().unwrap(), tree.object_exists(paths.last().unwrap()));
                 tree.add_object(
                     paths.last().unwrap(),
                     TreeObject::Blob(entry.sha1_hash.clone()),
                 );
-                
             }
-
         }
         // Create commit object
         let config = Config::from_file(&Path::new(GILLTTER_PATH).join(GILLTER_CONFIG_FILE))?;
@@ -188,7 +190,7 @@ impl Index {
         head_file.read_to_end(&mut file_bytes)?;
 
         // Safe to use from_utf8_lossy, since no funny stuff should be in 'head'
-        let parent_commit_hash = String::from_utf8_lossy(&file_bytes); // Empty, if first commit 
+        let parent_commit_hash = String::from_utf8_lossy(&file_bytes); // Empty, if first commit
 
         let mut commit = Commit::new();
         commit
@@ -247,7 +249,11 @@ impl ObjectPump for Index {
                 return Self::from_raw_data(&data);
             }
             Err(why) => {
-                return Err(anyhow!("Could not open '{}': {}", filepath.to_string_lossy(), why));
+                return Err(anyhow!(
+                    "Could not open '{}': {}",
+                    filepath.to_string_lossy(),
+                    why
+                ));
             }
         }
     }
@@ -276,8 +282,8 @@ impl ObjectDump for Index {
 }
 
 pub fn add_one_in_index(filepath: &Path) -> anyhow::Result<()> {
-    
-    let mut index = Index::from_file(&Path::new(GILLTTER_PATH).join(GILLTTER_INDEX_FILE)).expect("Config fucked up");
+    let mut index = Index::from_file(&Path::new(GILLTTER_PATH).join(GILLTTER_INDEX_FILE))
+        .expect("Config fucked up");
     // if index
     //     .indices
     //     .iter()
@@ -296,10 +302,9 @@ pub fn add_one_in_index(filepath: &Path) -> anyhow::Result<()> {
     index.remove(filepath);
     // I'd consider this a nasty hack
     // TODO: Do it the second way i guess?
-    
-    
+
     let file_sha1 = base::gilltter_add(filepath)?;
-    
+
     let add_file_metadata = std::fs::metadata(filepath)?;
     let entry: IndexEntry = IndexEntry::new(
         add_file_metadata.ctime(),
@@ -313,7 +318,7 @@ pub fn add_one_in_index(filepath: &Path) -> anyhow::Result<()> {
         filepath.to_owned(),
         file_sha1,
     );
-    
+
     index.add(entry);
 
     index.dump_to_file()?;
