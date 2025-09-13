@@ -124,60 +124,37 @@ fn traverse_dirs(entries: &mut Vec<IndexEntry>, path: std::path::PathBuf) -> any
 - Сравнить с индексом (work tree) => Получатся staged (index == work tree != head), commited (index == work tree == head)
 */
 
-pub(crate) fn gilltter_status() -> anyhow::Result<()> {
-    // Parse index
-    let index = Index::from_file(&Path::new(GILLTTER_PATH).join(GILLTTER_INDEX_FILE))?;
-
-    // Parse working tree
-    let mut work_tree_files = Vec::<IndexEntry>::new();
-    let dir = std::env::current_dir()?;
-    traverse_dirs(&mut work_tree_files, dir)?;
-    // println!("Worktree: {:#?}", work_tree_files);
-    // Сначала найдем untracked файлы => untracked файл это значит он есть в ворк три но нет в index
+fn get_untracked(work_tree_files: &Vec<IndexEntry>, index: &Index) -> Vec<IndexEntry> {
     let mut untracked_files: Vec<IndexEntry> = Vec::new();
 
-    let mut worktree_to_delete = Vec::new();
-    for (idx, worktree_entry) in work_tree_files.iter().enumerate() {
+    for worktree_entry in work_tree_files.iter() {
         if !index
             .indices
             .iter()
             .any(|val| worktree_entry.filename == val.filename)
         {
             untracked_files.push(worktree_entry.clone());
-            worktree_to_delete.push(idx);
         }
     }
-    for idx in worktree_to_delete.iter().rev() {
-        work_tree_files.remove(*idx);
-    }
+    untracked_files
+}
 
-    println!("========");
-    for entry in &untracked_files {
-        println!("{}: {:?}", "Untracked".red(), entry.filename);
-    }
-    println!("========");
-
-    // Untracked готовы
-    // Теперь с оставшимися нужно сделать unstaged
+fn get_unstaged(work_tree_files: &Vec<IndexEntry>, index: &Index) -> Vec<IndexEntry> {
     let mut unstaged_files: Vec<IndexEntry> = Vec::new();
-    for (_, index_entry) in index.indices.iter().enumerate() {
+    for index_entry in index.indices.iter() {
         let worktree_entry = work_tree_files
             .iter()
             .find(|val| val.filename == index_entry.filename);
         if let Some(worktree_entry) = worktree_entry {
             if worktree_entry.sha1_hash != index_entry.sha1_hash {
                 unstaged_files.push(worktree_entry.clone());
-            } else {
             }
         }
     }
+    unstaged_files
+}
 
-    println!("========");
-    for entry in &unstaged_files {
-        println!("{}: {:?}", "Unstaged:".yellow(), entry.filename);
-    }
-    println!("========");
-
+fn traverse_head_get_files() -> anyhow::Result<Vec<IndexEntry>> {
     let mut head_file = match std::fs::File::open(Path::new(GILLTTER_PATH).join(GILLTER_HEAD_FILE))
     {
         Ok(file) => file,
@@ -199,7 +176,8 @@ pub(crate) fn gilltter_status() -> anyhow::Result<()> {
             &Path::new(GILLTTER_PATH)
                 .join(GILLTER_OBJECTS_DIR)
                 .join(commit_sha.to_string()),
-        )?;
+        )
+        .map_err(|why| anyhow!("Commit file does not exist: {}", why))?;
 
         // Get a tree
         // println!("commit: {}", String::from_utf8_lossy(&commit.convert_to_bytes()));
@@ -214,47 +192,50 @@ pub(crate) fn gilltter_status() -> anyhow::Result<()> {
                 .join(GILLTER_OBJECTS_DIR)
                 .join(&tree_hash),
         )
-        .expect("How the fuck there is no such tree");
-        traverse_head_tree(&mut head_files, &mut current_path, &base_tree); // traverse from head untiil the end
+        .map_err(|why| anyhow!("Such tree does not exist: {}", why))?;
+        traverse_head_tree(&mut head_files, &mut current_path, &base_tree)?; // traverse from head untiil the end
     }
+    Ok(head_files)
+}
 
+fn get_staged_and_commited(
+    head_files: &Vec<IndexEntry>,
+    work_tree_files: &Vec<IndexEntry>,
+    index: &Index,
+) -> anyhow::Result<(Vec<IndexEntry>, Vec<IndexEntry>)> {
     let mut staged_files: Vec<IndexEntry> = Vec::new();
     let mut commited_files: Vec<IndexEntry> = Vec::new();
 
     if !head_files.is_empty() {
-        println!("Here");
-        // One way of figuring out staged, commited
-        // worktree_to_delete.clear();
-        //
-        for (_, index_entry) in index.indices.iter().enumerate() {
+        for index_entry in index.indices.iter() {
             let worktree_entry = work_tree_files
                 .iter()
                 .find(|val| val.filename == index_entry.filename);
             if let Some(worktree_entry) = worktree_entry {
-                if worktree_entry.sha1_hash == index_entry.sha1_hash {
-                    staged_files.push(worktree_entry.clone());
+                let head_file_opt = head_files
+                    .iter()
+                    .find(|el| el.filename == worktree_entry.filename);
+
+                let hash_comparison = worktree_entry.sha1_hash == index_entry.sha1_hash;
+                if hash_comparison {
+                    // if index == working tree
+                    if let Some(head_file) = head_file_opt {
+                        if head_file.sha1_hash != index_entry.sha1_hash {
+                            // Index matches Worktree but differs from HEAD => staged
+                            staged_files.push(worktree_entry.clone());
+                        } else {
+                            // All three match => committed
+                            commited_files.push(worktree_entry.clone());
+                        }
+                    } else {
+                        // File not in HEAD but staged
+                        staged_files.push(worktree_entry.clone());
+                    }
                 }
             }
-        }
-
-        let mut staged_to_remove_idxs = Vec::new();
-        for (i, file) in staged_files.iter().enumerate() {
-            let head_file_opt = head_files.iter().find(|el| el.filename == file.filename);
-            if let Some(head_file) = head_file_opt {
-                println!("{} {}", head_file.sha1_hash, file.sha1_hash);
-                if head_file.sha1_hash == file.sha1_hash {
-                    commited_files.push(head_file.clone());
-                    staged_to_remove_idxs.push(i);
-                }
-            }
-        }
-
-        // TODO: use retain instead of this shit
-        for idx in staged_to_remove_idxs.iter().rev() {
-            staged_files.remove(*idx);
         }
     } else {
-        for (_, index_entry) in index.indices.iter().enumerate() {
+        for index_entry in index.indices.iter() {
             let worktree_entry = work_tree_files
                 .iter()
                 .find(|val| val.filename == index_entry.filename);
@@ -264,22 +245,67 @@ pub(crate) fn gilltter_status() -> anyhow::Result<()> {
                 }
             }
         }
-        // Other way of doing the same thing
-        // head doesnt exist
-        // ir index_file == worktree and head doesn't exist, all files are staged
-        // if index_file != worktree => unstaged
-        // if work tree fle doesnt exist in index fie => untracked
     }
+    Ok((staged_files, commited_files))
+}
 
-    println!("========");
-    for entry in &staged_files {
-        println!("{}: {:?}", "Staged:".green(), entry.filename);
+// TODO: Better error handling, more transparent errors, check edge cases like when one of the tree doesn't exist
+// idea n1: use HashMaps instead of Vec to optimize lookup
+// idead n2: Store references instead of clones()
+pub(crate) fn gilltter_status() -> anyhow::Result<()> {
+    // Parse index
+    let index = Index::from_file(&Path::new(GILLTTER_PATH).join(GILLTTER_INDEX_FILE))?;
+
+    // Parse working tree
+    let mut work_tree_files = Vec::<IndexEntry>::new();
+    let dir = std::env::current_dir()?;
+    // FInd all work tree files and put into work_tree_files
+    traverse_dirs(&mut work_tree_files, dir)?;
+
+    // Сначала найдем untracked файлы => untracked файл это значит он есть в ворк три но нет в index
+    let untracked_files = get_untracked(&work_tree_files, &index);
+
+    // Теперь с оставшимися нужно сделать unstaged
+    let unstaged_files = get_unstaged(&work_tree_files, &index);
+
+    // Get head files
+    let head_files = traverse_head_get_files()?;
+
+    let (staged_files, commited_files) =
+        get_staged_and_commited(&head_files, &work_tree_files, &index)?;
+
+    println!("{}", "==== Unstaged Files ====".red().bold());
+    for entry in &unstaged_files {
+        println!("  {} {:?}", "modified:".yellow(), entry.filename);
     }
-    println!("=========");
+    println!();
+
+    println!("{}", "==== Staged Files ====".green().bold());
+    for entry in &staged_files {
+        println!("  {} {:?}", "staged:".green(), entry.filename);
+    }
+    println!();
+
+    // println!("{}", "==== Committed Files ====".blue().bold());
+    // for entry in &commited_files {
+    //     println!("  {} {:?}", "committed:".blue(), entry.filename);
+    // }
+    // println!();
+
+    println!("{}", "==== Untracked Files ====".magenta().bold());
+    for entry in &untracked_files {
+        println!("  {} {:?}", "untracked:".magenta(), entry.filename);
+    }
+    println!();
+
     Ok(())
 }
 
-fn traverse_head_tree(head_files: &mut Vec<IndexEntry>, current_path: &mut PathBuf, tree: &Tree) {
+fn traverse_head_tree(
+    head_files: &mut Vec<IndexEntry>,
+    current_path: &mut PathBuf,
+    tree: &Tree,
+) -> anyhow::Result<()> {
     let tree_objects = tree.get_objects();
     for (path, object) in &tree_objects {
         if let TreeObject::Blob(blob_hash) = object {
@@ -297,8 +323,9 @@ fn traverse_head_tree(head_files: &mut Vec<IndexEntry>, current_path: &mut PathB
                     .join(GILLTER_OBJECTS_DIR)
                     .join(tree.get_hash().unwrap()),
             )
-            .expect("How the fuck there is no such tree");
-            traverse_head_tree(head_files, &mut current_path.join(path), &tree);
+            .map_err(|why| anyhow!("Such tree does not exist: {}", why))?;
+            traverse_head_tree(head_files, &mut current_path.join(path), &tree)?;
         }
     }
+    Ok(())
 }

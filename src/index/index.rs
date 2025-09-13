@@ -250,7 +250,7 @@ impl ObjectPump for Index {
             }
             Err(why) => {
                 return Err(anyhow!(
-                    "Could not open '{}': {}",
+                    "Could not open index file: '{}', because {}",
                     filepath.to_string_lossy(),
                     why
                 ));
