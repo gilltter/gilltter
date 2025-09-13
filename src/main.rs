@@ -86,7 +86,9 @@ fn main() {
             }
         }
         Commands::Status => {
-            base::gilltter_status().unwrap();
+            if let Err(why) = base::gilltter_status() {
+                eprintln!("Status failed: {}", why);
+            }
         }
     }
 }
