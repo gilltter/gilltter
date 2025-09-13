@@ -127,6 +127,22 @@ fn traverse_dirs(entries: &mut Vec<IndexEntry>, path: std::path::PathBuf) -> any
 fn get_untracked(work_tree_files: &Vec<IndexEntry>, index: &Index) -> Vec<IndexEntry> {
     let mut untracked_files: Vec<IndexEntry> = Vec::new();
 
+    // TODO: maybe delete elements that are added to untracked from worktree, lookup will be faster
+    // but then again im switching to HashMap prolly
+    /*
+    work_tree_files.retain(|worktree_entry| {
+        if !index
+            .indices
+            .iter()
+            .any(|val| worktree_entry.filename == val.filename)
+        {
+            untracked_files.push(worktree_entry.clone());
+            return false;
+        }
+        true
+    });
+    */
+
     for worktree_entry in work_tree_files.iter() {
         if !index
             .indices
