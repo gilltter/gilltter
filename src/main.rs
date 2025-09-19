@@ -39,6 +39,11 @@ enum Commands {
     },
 
     Status,
+
+    #[command(arg_required_else_help = true)]
+    Revert {
+        commit_hash: PathBuf,
+    },
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -91,6 +96,11 @@ fn main() {
         Commands::Status => {
             if let Err(why) = commands::status::gilltter_status() {
                 eprintln!("Status failed: {}", why);
+            }
+        }
+        Commands::Revert { commit_hash } => {
+            if let Err(why) = commands::revert::revert(&commit_hash) {
+                eprintln!("Revert failed, i think project is fucked up now: {}", why);
             }
         }
     }

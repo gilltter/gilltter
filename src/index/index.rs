@@ -101,6 +101,10 @@ impl Index {
         self.indices.push(entry);
     }
 
+    pub fn remove_all(&mut self) {
+        self.indices.clear();
+    }
+
     pub fn remove(&mut self, filepath: &Path) -> bool {
         let pos = self
             .indices
