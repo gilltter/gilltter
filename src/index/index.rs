@@ -274,7 +274,7 @@ impl ObjectDump for Index {
         let compressed_content = index_content; // TODO: Remove after testing
 
         let path = Path::new(GILLTTER_PATH).join(GILLTTER_INDEX_FILE);
-        let mut index_file = OpenOptions::new().write(true).open(&path)?; // No point in using 'create(true)', since files are there at this point
+        let mut index_file = OpenOptions::new().write(true).truncate(true).open(&path)?; // No point in using 'create(true)', since files are there at this point
 
         index_file.write_all(&compressed_content)?;
         index_file.flush()?;
@@ -284,22 +284,20 @@ impl ObjectDump for Index {
 
 pub fn add_one_in_index(filepath: &Path) -> anyhow::Result<()> {
     let mut index = Index::from_file(&Path::new(GILLTTER_PATH).join(GILLTTER_INDEX_FILE))
-        .expect("Config fucked up");
-    // if index
-    //     .indices
-    //     .iter()
-    //     .find(|element| element.filename == filepath)
-    //     .is_some()
-    // {
-    //     return Err(anyhow!(
-    //         "File '{}' already exists",
-    //         filepath.to_string_lossy()
-    //     ));
-    // }
+        .expect("Index fucked up");
 
     // Notice: It is OK if the file already exists, means it is probably unstaged and user wanna stage it
     // If the file already exists, find it and update its metadata, or just delete and add again
     // First way:
+    println!("Filepath: {:?}, exists: {}", filepath, filepath.exists());
+    if !filepath.exists() {
+        // If file is deleted, then just remove it from the index
+        index.remove(filepath);
+        let name = index.dump_to_file()?;
+
+        println!("Dumped name: {}", name);
+        return Ok(());
+    }
     index.remove(filepath);
     // I'd consider this a nasty hack
     // TODO: Do it the second way i guess?

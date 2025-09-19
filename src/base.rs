@@ -83,7 +83,10 @@ fn get_file_contents(path: &Path) -> anyhow::Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn traverse_dirs(entries: &mut Vec<IndexEntry>, path: std::path::PathBuf) -> anyhow::Result<()> {
+fn traverse_dirs_impl(
+    entries: &mut Vec<IndexEntry>,
+    path: std::path::PathBuf,
+) -> anyhow::Result<()> {
     let dir = path;
     let root_path = std::env::current_dir()?;
     for entry in std::fs::read_dir(dir)? {
@@ -111,10 +114,18 @@ fn traverse_dirs(entries: &mut Vec<IndexEntry>, path: std::path::PathBuf) -> any
             {
                 continue;
             }
-            traverse_dirs(entries, entry.path())?;
+            traverse_dirs_impl(entries, entry.path())?;
         }
     }
     Ok(())
+}
+
+pub fn traverse_dirs(path: std::path::PathBuf) -> anyhow::Result<Vec<IndexEntry>> {
+    let mut entries: Vec<IndexEntry> = Vec::new();
+    if let Err(why) = traverse_dirs_impl(&mut entries, path) {
+        return Err(why);
+    }
+    Ok(entries)
 }
 
 fn get_untracked(work_tree_files: &Vec<IndexEntry>, index: &Index) -> Vec<IndexEntry> {
@@ -145,6 +156,75 @@ fn get_unstaged(work_tree_files: &Vec<IndexEntry>, index: &Index) -> Vec<IndexEn
         }
     }
     unstaged_files
+}
+
+// fn get_deleted_files(work_tree_files: &Vec<IndexEntry>, index: &Index) -> Vec<IndexEntry> {
+//     let mut deleted_files: Vec<IndexEntry> = Vec::new();
+//     for index_entry in index.indices.iter() {
+//         let worktree_entry = work_tree_files
+//             .iter()
+//             .find(|val| val.filename == index_entry.filename);
+//         if let None = worktree_entry {
+//             deleted_files.push(index_entry.clone());
+//         }
+//     }
+//     deleted_files
+// }
+fn get_deleted_files(
+    work_tree_files: &Vec<IndexEntry>,
+    head_files: &Vec<IndexEntry>,
+    index: &Index,
+) -> Vec<IndexEntry> {
+    let mut deleted_files: Vec<IndexEntry> = Vec::new();
+
+    // если файл удален, но не staged, то добавляем в deleted_files Entry с метаданными = изменение не закомичено
+    // если файл удален, и staged (gilltter add <deleted-file>), то добавляем в deleted_files Entry без метаданных = изменение закомичено
+    for index_entry in index.indices.iter() {
+        // Find unstaged deleted files
+        let worktree_entry = work_tree_files
+            .iter()
+            .find(|val| val.filename == index_entry.filename);
+        if worktree_entry.is_none() {
+            deleted_files.push(index_entry.clone());
+        }
+    }
+
+    for head_entry in head_files.iter() {
+        let index_entry = index
+            .indices
+            .iter()
+            .find(|val| val.filename == head_entry.filename);
+        if index_entry.is_none() {
+            println!("HEREJKLJKLS:JKL:FSLJK:DFSDJKL:FDJKL:DFJKL:");
+            // File is deleted and staged
+            deleted_files.push(head_entry.clone());
+        }
+    }
+
+    // for head_entry in head_files.iter() {
+    //     let worktree_entry = work_tree_files
+    //         .iter()
+    //         .find(|val| val.filename == head_entry.filename);
+    //     let index_entry = index
+    //         .indices
+    //         .iter()
+    //         .find(|val| val.filename == head_entry.filename);
+    //     if worktree_entry.is_none() && index_entry.is_some() {
+    //         // если файл удален, но не staged, то добавляем в deleted_files Entry с метаданными = изменение не закомичено
+    //         deleted_files.push(index_entry.unwrap().clone());
+    //     } else if worktree_entry.is_none() && index_entry.is_none() {
+    //
+    //         deleted_files.push(head_entry.clone());
+    //     } else {
+    //         println!(
+    //             "hod {:?} {} {}",
+    //             head_entry.filename,
+    //             worktree_entry.is_some(),
+    //             index_entry.is_some()
+    //         );
+    //     }
+    // }
+    deleted_files
 }
 
 fn traverse_head_get_files() -> anyhow::Result<Vec<IndexEntry>> {
@@ -279,10 +359,9 @@ pub(crate) fn gilltter_status() -> anyhow::Result<()> {
     let index = Index::from_file(&Path::new(GILLTTER_PATH).join(GILLTTER_INDEX_FILE))?;
 
     // Parse working tree
-    let mut work_tree_files = Vec::<IndexEntry>::new();
     let dir = std::env::current_dir()?;
     // FInd all work tree files and put into work_tree_files
-    traverse_dirs(&mut work_tree_files, dir)?;
+    let work_tree_files = traverse_dirs(dir)?;
 
     // Сначала найдем untracked файлы => untracked файл это значит он есть в ворк три но нет в index
     let untracked_files = get_untracked(&work_tree_files, &index);
@@ -296,6 +375,18 @@ pub(crate) fn gilltter_status() -> anyhow::Result<()> {
     let (staged_files, commited_files) =
         get_staged_and_commited(&head_files, &work_tree_files, &index)?;
 
+    let deleted_files = get_deleted_files(&work_tree_files, &head_files, &index);
+
+    println!("{}", "==== Deleted Files ====".red().bold());
+    for entry in &deleted_files {
+        println!("Deleted: '{:?}' '{}'", entry.filename, entry.ctime);
+        if entry.ctime > 0 {
+            println!("  {} {:?}", "deleted:".red(), entry.filename);
+        } else {
+            println!("  {} {:?}", "deleted:".green(), entry.filename);
+        }
+    }
+
     println!("{}", "==== Unstaged Files ====".red().bold());
     for entry in &unstaged_files {
         println!("  {} {:?}", "modified:".yellow(), entry.filename);
@@ -308,16 +399,10 @@ pub(crate) fn gilltter_status() -> anyhow::Result<()> {
     }
     println!();
 
-    // println!("{}", "==== Committed Files ====".blue().bold());
-    // for entry in &commited_files {
-    //     println!("  {} {:?}", "committed:".blue(), entry.filename);
+    // println!("{}", "==== Untracked Files ====".magenta().bold());
+    // for entry in &untracked_files {
+    //     println!("  {} {:?}", "untracked:".magenta(), entry.filename);
     // }
-    // println!();
-
-    println!("{}", "==== Untracked Files ====".magenta().bold());
-    for entry in &untracked_files {
-        println!("  {} {:?}", "untracked:".magenta(), entry.filename);
-    }
     println!();
 
     Ok(())
