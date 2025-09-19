@@ -1,4 +1,5 @@
 use std::{
+    fs::OpenOptions,
     io::Write,
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
@@ -7,7 +8,7 @@ use std::{
 use anyhow::anyhow;
 
 use crate::{
-    base::{GILLTER_OBJECTS_DIR, GILLTTER_INDEX_FILE, GILLTTER_PATH},
+    base::{GILLTER_HEAD_FILE, GILLTER_OBJECTS_DIR, GILLTTER_INDEX_FILE, GILLTTER_PATH},
     index::index::{Index, IndexEntry, IndexType},
     objects::{
         ObjectDump, ObjectPump,
@@ -15,6 +16,7 @@ use crate::{
         commit::Commit,
         tree::{Tree, TreeObject},
     },
+    utils,
 };
 
 pub fn revert(commit_hash: &Path) -> anyhow::Result<()> {
@@ -88,7 +90,8 @@ pub fn revert(commit_hash: &Path) -> anyhow::Result<()> {
             file_metadata.size(),
             IndexType::RegularFile,
             object_file.filename.clone(),
-            object_file.sha1_hash.clone(),
+            // object_file.sha1_hash.clone(),
+            utils::generate_hash(&blob.convert_to_bytes()),
         ));
 
         file.flush()?;
@@ -96,6 +99,14 @@ pub fn revert(commit_hash: &Path) -> anyhow::Result<()> {
 
     // Save index file
     index.dump_to_file()?;
+
+    // Update head TODO
+    let mut head_file = OpenOptions::new()
+        .truncate(true)
+        .write(true)
+        .open(&Path::new(GILLTTER_PATH).join(GILLTER_HEAD_FILE))?;
+    head_file.write_all(commit_hash.to_string_lossy().as_bytes())?;
+    head_file.flush()?;
     Ok(())
 }
 

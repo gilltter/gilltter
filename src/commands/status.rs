@@ -310,10 +310,10 @@ pub(crate) fn gilltter_status() -> anyhow::Result<()> {
     }
     println!();
 
-    // println!("{}", "==== Untracked Files ====".magenta().bold());
-    // for entry in &untracked_files {
-    //     println!("  {} {:?}", "untracked:".magenta(), entry.filename);
-    // }
+    println!("{}", "==== Untracked Files ====".magenta().bold());
+    for entry in &untracked_files {
+        println!("  {} {:?}", "untracked:".magenta(), entry.filename);
+    }
     println!();
 
     Ok(())

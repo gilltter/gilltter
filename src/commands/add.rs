@@ -13,7 +13,7 @@ pub fn add(filepath: &Path) -> anyhow::Result<()> {
     // Notice: It is OK if the file already exists, means it is probably unstaged and user wanna stage it
     // If the file already exists, find it and update its metadata, or just delete and add again
     // First way:
-    println!("Filepath: {:?}, exists: {}", filepath, filepath.exists());
+    // println!("Filepath: {:?}, exists: {}", filepath, filepath.exists());
     if !filepath.exists() {
         // If file is deleted, then just remove it from the index
         index.remove(filepath);

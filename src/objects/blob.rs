@@ -87,7 +87,7 @@ impl ObjectPump for Blob {
         }
 
         return Ok(Blob {
-            content: content[1..].to_owned(),
+            content: content.to_owned(),
         });
     }
 }
