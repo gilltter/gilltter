@@ -1,6 +1,6 @@
 use crate::{
     base::{self, GILLTER_CONFIG_FILE, GILLTER_HEAD_FILE, GILLTTER_INDEX_FILE, GILLTTER_PATH},
-    config::Config,
+    config::{self, Config},
     objects::{
         ObjectDump, ObjectPump,
         commit::Commit,
@@ -132,10 +132,8 @@ impl Index {
             }
 
             // Make sure src tree exists
-            base_tree.add_object_if_not_exists(paths.first().unwrap(), || {
-                println!("Tree name: '{}'", paths.first().unwrap());
-                TreeObject::Tree(Tree::new())
-            });
+            base_tree
+                .add_object_if_not_exists(paths.first().unwrap(), || TreeObject::Tree(Tree::new()));
 
             // Current reference to tree so we can like traverse it
             let mut this_tree: &mut TreeObject =
@@ -165,10 +163,13 @@ impl Index {
         // Create commit object
         let config = Config::from_file(&Path::new(GILLTTER_PATH).join(GILLTER_CONFIG_FILE))?;
         let username = config
-            .get("General", "Username")
+            .get(
+                config::CONFIG_GENERAL_SECTION,
+                config::CONFIG_USERNAME_FIELD,
+            )
             .ok_or(anyhow!("Username should be set in config file"))?;
         let email = config
-            .get("General", "Email")
+            .get(config::CONFIG_GENERAL_SECTION, config::CONFIG_EMAIL_FIELD)
             .ok_or(anyhow!("Email should be set in config file"))?;
 
         let base_tree_hash = base_tree.dump_to_file()?;

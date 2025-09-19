@@ -50,7 +50,11 @@ impl ObjectPump for Blob {
                 return Blob::from_raw_data(&data);
             }
             Err(why) => {
-                return Err(anyhow!("Could not open the file {}: {}", filepath.to_string_lossy(), why));
+                return Err(anyhow!(
+                    "Could not open the file {}: {}",
+                    filepath.to_string_lossy(),
+                    why
+                ));
             }
         }
     }
@@ -65,7 +69,8 @@ impl ObjectPump for Blob {
 
         let header = &file_contents[..null_pos];
         let blob_size: usize = String::from_utf8_lossy(&header[5..null_pos])
-            .parse().map_err(|err| anyhow!("Blob size is not usize: {}", err))?;
+            .parse()
+            .map_err(|err| anyhow!("Blob size is not usize: {}", err))?;
         let file_type = &header[0..4];
         if file_type != BLOB_TYPE_STRING {
             return Err(anyhow!("File is not of type blob"));
@@ -108,12 +113,14 @@ impl ObjectDump for Blob {
         let filedata = blob_content.clone(); // TODO: Remove after testing
         let filename = utils::generate_hash(&blob_content);
 
-        let path = Path::new(GILLTTER_PATH).join(GILLTER_OBJECTS_DIR).join(filename.as_str());
+        let path = Path::new(GILLTTER_PATH)
+            .join(GILLTER_OBJECTS_DIR)
+            .join(filename.as_str());
         let mut file = File::create(path)?;
         file.write_all(&filedata)?;
         file.flush()?;
         Ok(filename)
-    } 
+    }
 }
 
 #[cfg(test)]
@@ -123,7 +130,7 @@ mod tests {
     #[test]
     fn add_blob_and_load_it() {
         let mut contents = Vec::<u8>::new();
-        contents.extend_from_slice("heil gilltter".as_bytes());
+        contents.extend_from_slice("hi gilltter".as_bytes());
 
         let mut blob = Blob::new();
         blob.set_data(&contents);

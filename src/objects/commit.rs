@@ -9,11 +9,14 @@ use anyhow::anyhow;
 
 use crate::{
     base::{GILLTER_OBJECTS_DIR, GILLTTER_PATH},
-    objects::{ObjectDump, ObjectPump, tree::TREE_TYPE_STRING},
+    objects::{
+        ObjectDump, ObjectPump,
+        tree::{self, TREE_TYPE_STRING},
+    },
     utils,
 };
 
-const COMMIT_TYPE_STRING: &'static [u8] = b"commit";
+const COMMIT_TYPE_STRING: &'static str = "commit";
 
 pub struct Commit {
     tree_sha: Option<String>,
@@ -91,14 +94,21 @@ impl Commit {
 impl ObjectDump for Commit {
     fn convert_to_bytes(&self) -> Vec<u8> {
         if self.tree_sha.is_none() || self.username.is_none() || self.email.is_none() {
-            panic!("Ты долбоеб?")
+            panic!("Mandatory fields are not set");
         }
         let mut bytes = Vec::new();
 
-        bytes.extend_from_slice(COMMIT_TYPE_STRING);
+        bytes.extend_from_slice(COMMIT_TYPE_STRING.as_bytes());
         // bytes.extend_from_slice(format!(" {}\0", bytes_cnt).as_bytes());
         // Tree setup
-        bytes.extend_from_slice(format!("tree {}", self.tree_sha.as_ref().unwrap()).as_bytes());
+        bytes.extend_from_slice(
+            format!(
+                "{} {}",
+                tree::TREE_TYPE_STRING,
+                self.tree_sha.as_ref().unwrap()
+            )
+            .as_bytes(),
+        );
 
         // Parent commit setup (if there is one)
         if let Some(parent_sha) = self.parent_commit_sha.as_ref() {
@@ -158,7 +168,7 @@ impl ObjectPump for Commit {
         let header = &data[0..null_pos];
         let content = &data[null_pos + 1..];
 
-        if &header[0..COMMIT_TYPE_STRING.len()] != COMMIT_TYPE_STRING {
+        if &header[0..COMMIT_TYPE_STRING.len()] != COMMIT_TYPE_STRING.as_bytes() {
             return Err(anyhow!("Object type is incorrect"));
         }
         let size_commit_bytes = &header[COMMIT_TYPE_STRING.len() + 1..null_pos];
@@ -169,15 +179,15 @@ impl ObjectPump for Commit {
         let mut data = content;
 
         // Get treee
-       
+
         let tree_type_str = &data[0..TREE_TYPE_STRING.len()];
-        
-        if tree_type_str != TREE_TYPE_STRING {
+
+        if tree_type_str != TREE_TYPE_STRING.as_bytes() {
             return Err(anyhow!("Want a tree here"));
         }
 
         data = &data[TREE_TYPE_STRING.len() + 1..]; // start at tree [p]dsadsasa7727 < here
-        
+
         let tree_sha = String::from_utf8_lossy(&data[0..40]);
         commit.set_tree_sha(tree_sha.to_string());
 

@@ -16,6 +16,10 @@ use anyhow::anyhow;
 
 use crate::objects::ObjectPump;
 
+pub const CONFIG_GENERAL_SECTION: &'static str = "General";
+pub const CONFIG_USERNAME_FIELD: &'static str = "Username";
+pub const CONFIG_EMAIL_FIELD: &'static str = "Email";
+
 pub struct Config {
     variables: HashMap<String, HashMap<String, String>>, // Category -> [<var-name> <var-value, ...]
 }
@@ -46,7 +50,7 @@ impl Config {
                     let value = &line[equal_pos + 1..];
                     config.add(&current_category, name, value);
                 } else {
-                    return Err(anyhow!("Malformed line: {}", line))
+                    return Err(anyhow!("Malformed line: {}", line));
                 }
             }
         }

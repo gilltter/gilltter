@@ -104,6 +104,7 @@ fn traverse_dirs(entries: &mut Vec<IndexEntry>, path: std::path::PathBuf) -> any
                 sha1,
             ));
         } else if filetype.is_dir() {
+            // TODO: Get rid of this shit
             if entry.file_name() == "target"
                 || entry.file_name() == ".gilltter"
                 || entry.file_name() == ".git"
@@ -116,32 +117,8 @@ fn traverse_dirs(entries: &mut Vec<IndexEntry>, path: std::path::PathBuf) -> any
     Ok(())
 }
 
-/*
-- Спарсить индекс
-- Спарсить воркинг три
-- Сравнить => (получатся unstaged, untracked файлы)
-- Спарсить хед
-- Сравнить с индексом (work tree) => Получатся staged (index == work tree != head), commited (index == work tree == head)
-*/
-
 fn get_untracked(work_tree_files: &Vec<IndexEntry>, index: &Index) -> Vec<IndexEntry> {
     let mut untracked_files: Vec<IndexEntry> = Vec::new();
-
-    // TODO: maybe delete elements that are added to untracked from worktree, lookup will be faster
-    // but then again im switching to HashMap prolly
-    /*
-    work_tree_files.retain(|worktree_entry| {
-        if !index
-            .indices
-            .iter()
-            .any(|val| worktree_entry.filename == val.filename)
-        {
-            untracked_files.push(worktree_entry.clone());
-            return false;
-        }
-        true
-    });
-    */
 
     for worktree_entry in work_tree_files.iter() {
         if !index
@@ -265,6 +242,35 @@ fn get_staged_and_commited(
     Ok((staged_files, commited_files))
 }
 
+fn traverse_head_tree(
+    head_files: &mut Vec<IndexEntry>,
+    current_path: &mut PathBuf,
+    tree: &Tree,
+) -> anyhow::Result<()> {
+    let tree_objects = tree.get_objects();
+    for (path, object) in &tree_objects {
+        if let TreeObject::Blob(blob_hash) = object {
+            head_files.push(IndexEntry::new(
+                0,
+                0,
+                0,
+                IndexType::RegularFile,
+                current_path.join(path),
+                blob_hash.to_string(),
+            ));
+        } else if let TreeObject::Tree(tree) = object {
+            let tree = Tree::from_file(
+                &Path::new(GILLTTER_PATH)
+                    .join(GILLTER_OBJECTS_DIR)
+                    .join(tree.get_hash().unwrap()),
+            )
+            .map_err(|why| anyhow!("Such tree does not exist: {}", why))?;
+            traverse_head_tree(head_files, &mut current_path.join(path), &tree)?;
+        }
+    }
+    Ok(())
+}
+
 // TODO: Better error handling, more transparent errors, check edge cases like when one of the tree doesn't exist
 // idea n1: use HashMaps instead of Vec to optimize lookup
 // idead n2: Store references instead of clones()
@@ -314,34 +320,5 @@ pub(crate) fn gilltter_status() -> anyhow::Result<()> {
     }
     println!();
 
-    Ok(())
-}
-
-fn traverse_head_tree(
-    head_files: &mut Vec<IndexEntry>,
-    current_path: &mut PathBuf,
-    tree: &Tree,
-) -> anyhow::Result<()> {
-    let tree_objects = tree.get_objects();
-    for (path, object) in &tree_objects {
-        if let TreeObject::Blob(blob_hash) = object {
-            head_files.push(IndexEntry::new(
-                0,
-                0,
-                0,
-                IndexType::RegularFile,
-                current_path.join(path),
-                blob_hash.to_string(),
-            ));
-        } else if let TreeObject::Tree(tree) = object {
-            let tree = Tree::from_file(
-                &Path::new(GILLTTER_PATH)
-                    .join(GILLTER_OBJECTS_DIR)
-                    .join(tree.get_hash().unwrap()),
-            )
-            .map_err(|why| anyhow!("Such tree does not exist: {}", why))?;
-            traverse_head_tree(head_files, &mut current_path.join(path), &tree)?;
-        }
-    }
     Ok(())
 }

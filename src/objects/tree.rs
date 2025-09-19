@@ -21,7 +21,7 @@ pub enum FileType {
     Directory,
 }
 
-pub const TREE_TYPE_STRING: &'static [u8] = b"tree";
+pub const TREE_TYPE_STRING: &'static str = "tree";
 
 impl FileType {
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -134,7 +134,7 @@ impl ObjectDump for Tree {
     fn convert_to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
 
-        bytes.extend_from_slice(TREE_TYPE_STRING);
+        bytes.extend_from_slice(TREE_TYPE_STRING.as_bytes());
         bytes.extend_from_slice(SPACE_STR);
 
         let mut bytes_count = 0;
@@ -180,7 +180,9 @@ impl ObjectDump for Tree {
         let filedata = tree_content.clone(); // TODO: Remove this after testing
         let filename = utils::generate_hash(&tree_content);
 
-        let path = Path::new(GILLTTER_PATH).join(GILLTER_OBJECTS_DIR).join(filename.as_str());
+        let path = Path::new(GILLTTER_PATH)
+            .join(GILLTER_OBJECTS_DIR)
+            .join(filename.as_str());
         let mut file = File::create(path)?;
         file.write_all(&filedata)?;
         file.flush()?;
@@ -212,7 +214,7 @@ impl ObjectPump for Tree {
         let header = &data[0..null_pos];
         let content = &data[null_pos + 1..];
 
-        if &header[0..TREE_TYPE_STRING.len()] != TREE_TYPE_STRING {
+        if &header[0..TREE_TYPE_STRING.len()] != TREE_TYPE_STRING.as_bytes() {
             return Err(anyhow!("Object type is incorrect"));
         }
 
@@ -229,10 +231,10 @@ impl ObjectPump for Tree {
             let obj_type_bytes = &data[0..6];
             let obj_type =
                 FileType::from_bytes(obj_type_bytes).ok_or(anyhow!("Weird file type"))?;
-            
+
             // Move to filename
-            data = &data[7..]; 
-            
+            data = &data[7..];
+
             let null_pos = data
                 .iter()
                 .position(|element| *element == *"\0".as_bytes().first().unwrap())
@@ -267,7 +269,7 @@ impl ObjectPump for Tree {
                 let mut file_contents = Vec::new();
                 file.read_to_end(&mut file_contents)?;
 
-                // let data = utils::decompress(&file_contents)?; // TODO: corrupt deflate stream if empty 
+                // let data = utils::decompress(&file_contents)?; // TODO: corrupt deflate stream if empty
                 let data = file_contents;
                 return Tree::from_raw_data(&data);
             }
