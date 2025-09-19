@@ -9,6 +9,7 @@ use crate::{
 };
 
 mod base;
+mod commands;
 mod config;
 mod index;
 mod objects;
@@ -61,7 +62,7 @@ fn main() {
         Commands::Add { command } => match command {
             AddCommands::Filename { file } => {
                 // println!("Adding");
-                if let Err(why) = index::index::add_one_in_index(&file) {
+                if let Err(why) = commands::add::add(&file) {
                     eprintln!(
                         "Could not add a file '{}', because: {}",
                         file.to_string_lossy(),
@@ -76,7 +77,9 @@ fn main() {
         Commands::Commit { message } => {
             match Index::from_file(&Path::new(GILLTTER_PATH).join(GILLTTER_INDEX_FILE)) {
                 Ok(index) => {
-                    if let Err(why) = index.commit(message.expect("Type a message")) {
+                    if let Err(why) =
+                        commands::commit::commit(&index, message.expect("Type a message"))
+                    {
                         eprintln!("Could not commit: {}", why);
                     }
                 }
@@ -86,7 +89,7 @@ fn main() {
             }
         }
         Commands::Status => {
-            if let Err(why) = base::gilltter_status() {
+            if let Err(why) = commands::status::gilltter_status() {
                 eprintln!("Status failed: {}", why);
             }
         }

@@ -1,7 +1,12 @@
-use std::io::{Read, Write};
+use std::{
+    io::{Read, Write},
+    path::Path,
+};
 
 use flate2::{Compression, read::ZlibDecoder, write::ZlibEncoder};
 use sha1::{Digest, Sha1};
+
+use crate::objects::{ObjectDump, blob::Blob};
 
 #[allow(dead_code)]
 #[cfg(target_os = "linux")]
@@ -58,4 +63,15 @@ pub fn decompress(contents: &[u8]) -> anyhow::Result<Vec<u8>> {
     let mut buf = Vec::new();
     d.read_to_end(&mut buf)?;
     Ok(buf)
+}
+
+pub fn get_file_contents_as_blob(path: &Path) -> anyhow::Result<Vec<u8>> {
+    let mut file = std::fs::File::open(path)?;
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)?;
+    let mut blob = Blob::new();
+    blob.set_data(&bytes);
+
+    let bytes = blob.convert_to_bytes();
+    Ok(bytes)
 }
