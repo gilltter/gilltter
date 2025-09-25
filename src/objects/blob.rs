@@ -128,17 +128,54 @@ mod tests {
     use super::*;
 
     #[test]
-    fn add_blob_and_load_it() {
+    fn save_blob() {
         let mut contents = Vec::<u8>::new();
         contents.extend_from_slice("hi gilltter".as_bytes());
 
         let mut blob = Blob::new();
         blob.set_data(&contents);
 
-        let filename = blob.dump_to_file().unwrap();
-        println!("f: {}", filename);
+        let blob_bytes = blob.convert_to_bytes();
+        assert!(!blob_bytes.is_empty());
+    }
 
-        #[allow(unused)]
-        let blob = Blob::from_file(Path::new(&format!(".gilltter/objects/{}", filename))).unwrap();
+    fn get_blob() -> Blob {
+        let mut contents = Vec::<u8>::new();
+        contents.extend_from_slice("hi gilltter".as_bytes());
+
+        let mut blob = Blob::new();
+        blob.set_data(&contents);
+
+        let blob_bytes = blob.convert_to_bytes();
+        blob
+    }
+
+    #[test]
+    fn blob_from_compressed_bytes() {
+        let blob = get_blob();
+        let blob_bytes = blob.convert_to_bytes();
+        let compressed_bytes = utils::compress(&blob_bytes).unwrap();
+
+        let decompressed_bytes = utils::decompress(&compressed_bytes).unwrap();
+        let blob = Blob::from_raw_data(&decompressed_bytes).unwrap();
+        let data = blob.get_data();
+        assert_eq!(String::from_utf8_lossy(&data), "hi gilltter");
+    }
+
+    #[test]
+    fn blob_from_file() {
+        let blob = get_blob();
+        let blob_hash = blob.dump_to_file().unwrap();
+
+        let path = Path::new(GILLTTER_PATH)
+            .join(GILLTER_OBJECTS_DIR)
+            .join(blob_hash.as_str());
+        let blob = Blob::from_file(&path).unwrap();
+    }
+
+    #[test]
+    fn blob_to_file() {
+        let blob = get_blob();
+        blob.dump_to_file().unwrap();
     }
 }

@@ -93,18 +93,6 @@ fn get_unstaged(work_tree_files: &Vec<IndexEntry>, index: &Index) -> Vec<IndexEn
     unstaged_files
 }
 
-// fn get_deleted_files(work_tree_files: &Vec<IndexEntry>, index: &Index) -> Vec<IndexEntry> {
-//     let mut deleted_files: Vec<IndexEntry> = Vec::new();
-//     for index_entry in index.indices.iter() {
-//         let worktree_entry = work_tree_files
-//             .iter()
-//             .find(|val| val.filename == index_entry.filename);
-//         if let None = worktree_entry {
-//             deleted_files.push(index_entry.clone());
-//         }
-//     }
-//     deleted_files
-// }
 fn get_deleted_files(
     work_tree_files: &Vec<IndexEntry>,
     head_files: &Vec<IndexEntry>,
