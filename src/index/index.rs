@@ -164,15 +164,19 @@ impl ObjectPump for Index {
 }
 
 impl ObjectDump for Index {
-    fn convert_to_bytes(&self) -> Vec<u8> {
+    fn convert_to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        if self.indices.is_empty() {
+            return Err(anyhow!("Can't convert empty Index to bytes"));
+            // panic!("Can't convert empty Index to bytes");
+        }
         let mut bytes = Vec::new();
         for index in &self.indices {
             bytes.extend_from_slice(&index.convert_to_bytes());
         }
-        bytes
+        Ok(bytes)
     }
     fn dump_to_file(&self) -> anyhow::Result<String> {
-        let index_content = self.convert_to_bytes();
+        let index_content = self.convert_to_bytes()?;
         // let compressed_content = utils::compress(&index_content)?;
         let compressed_content = index_content; // TODO: Remove after testing
 

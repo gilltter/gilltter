@@ -72,6 +72,6 @@ pub fn get_file_contents_as_blob(path: &Path) -> anyhow::Result<Vec<u8>> {
     let mut blob = Blob::new();
     blob.set_data(&bytes);
 
-    let bytes = blob.convert_to_bytes();
+    let bytes = blob.convert_to_bytes()?;
     Ok(bytes)
 }

@@ -65,7 +65,7 @@ impl ObjectPump for Blob {
         let null_pos = file_contents
             .iter()
             .position(|element| *element == *"\0".as_bytes().first().unwrap())
-            .ok_or(anyhow!("No null terminator in file"))?;
+            .ok_or(anyhow!("No null terminator in file blob"))?;
 
         let header = &file_contents[..null_pos];
         let blob_size: usize = String::from_utf8_lossy(&header[5..null_pos])
@@ -93,7 +93,8 @@ impl ObjectPump for Blob {
 }
 
 impl ObjectDump for Blob {
-    fn convert_to_bytes(&self) -> Vec<u8> {
+    // Blob cant fail here
+    fn convert_to_bytes(&self) -> anyhow::Result<Vec<u8>> {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(
             format!(
@@ -104,11 +105,11 @@ impl ObjectDump for Blob {
             .as_bytes(),
         );
         bytes.extend_from_slice(&self.content);
-        bytes
+        Ok(bytes)
     }
 
     fn dump_to_file(&self) -> anyhow::Result<String> {
-        let blob_content = self.convert_to_bytes();
+        let blob_content = self.convert_to_bytes()?;
         // let filedata = utils::compress(&blob_content)?;
         let filedata = blob_content.clone(); // TODO: Remove after testing
         let filename = utils::generate_hash(&blob_content);
@@ -135,7 +136,7 @@ mod tests {
         let mut blob = Blob::new();
         blob.set_data(&contents);
 
-        let blob_bytes = blob.convert_to_bytes();
+        let blob_bytes = blob.convert_to_bytes().unwrap();
         assert!(!blob_bytes.is_empty());
     }
 
@@ -153,7 +154,7 @@ mod tests {
     #[test]
     fn blob_from_compressed_bytes() {
         let blob = get_blob();
-        let blob_bytes = blob.convert_to_bytes();
+        let blob_bytes = blob.convert_to_bytes().unwrap();
         let compressed_bytes = utils::compress(&blob_bytes).unwrap();
 
         let decompressed_bytes = utils::decompress(&compressed_bytes).unwrap();

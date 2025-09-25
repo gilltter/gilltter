@@ -7,7 +7,7 @@ pub mod tree;
 pub const SPACE_STR: &'static [u8] = b" ";
 
 pub trait ObjectDump {
-    fn convert_to_bytes(&self) -> Vec<u8>;
+    fn convert_to_bytes(&self) -> anyhow::Result<Vec<u8>>;
     fn dump_to_file(&self) -> anyhow::Result<String>;
 }
 

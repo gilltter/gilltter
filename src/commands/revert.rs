@@ -91,7 +91,7 @@ pub fn revert(commit_hash: &Path) -> anyhow::Result<()> {
             IndexType::RegularFile,
             object_file.filename.clone(),
             // object_file.sha1_hash.clone(),
-            utils::generate_hash(&blob.convert_to_bytes()),
+            utils::generate_hash(&blob.convert_to_bytes().unwrap()), // blob convert to bytes cant fail
         ));
 
         file.flush()?;

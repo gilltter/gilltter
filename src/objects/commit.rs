@@ -92,9 +92,15 @@ impl Commit {
 }
 
 impl ObjectDump for Commit {
-    fn convert_to_bytes(&self) -> Vec<u8> {
-        if self.tree_sha.is_none() || self.username.is_none() || self.email.is_none() {
-            panic!("Mandatory fields are not set");
+    fn convert_to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        if self.tree_sha.is_none()
+            || self.username.is_none()
+            || self.email.is_none()
+            || self.message.is_none()
+        {
+            return Err(anyhow!(
+                "Mandatory fields are not set, can't convert this commit"
+            ));
         }
         let mut bytes = Vec::new();
 
@@ -136,10 +142,10 @@ impl ObjectDump for Commit {
         bytes.extend_from_slice(&format!(" {}\0", bytes_cnt).as_bytes());
         bytes.extend(v.iter());
 
-        bytes
+        Ok(bytes)
     }
     fn dump_to_file(&self) -> anyhow::Result<String> {
-        let commit_content = self.convert_to_bytes();
+        let commit_content = self.convert_to_bytes()?;
         let filename = utils::generate_hash(&commit_content);
         // let filedata = utils::compress(&commit_content)?;
         let filedata = commit_content; // TODO: Remove after testing
@@ -172,14 +178,13 @@ impl ObjectPump for Commit {
             return Err(anyhow!("Object type is incorrect"));
         }
         let size_commit_bytes = &header[COMMIT_TYPE_STRING.len() + 1..null_pos];
-        let _commit_size = String::from_utf8_lossy(size_commit_bytes)
+        let commit_size = String::from_utf8_lossy(size_commit_bytes)
             .trim()
             .parse::<u32>()?;
 
         let mut data = content;
 
-        // Get treee
-
+        // Get tree
         let tree_type_str = &data[0..TREE_TYPE_STRING.len()];
 
         if tree_type_str != TREE_TYPE_STRING.as_bytes() {
@@ -280,92 +285,47 @@ impl ObjectPump for Commit {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
-    use crate::{
-        config::Config,
-        objects::{
-            self,
-            blob::Blob,
-            tree::{Object, Tree, TreeObject},
-        },
-    };
-
     use super::*;
 
-    fn gilltter_add(filepath: &str) -> String {
-        // let mut file = File::open(filepath).unwrap();
-        // let mut contents = Vec::new();
-        // file.read_to_end(&mut contents).unwrap();
-
-        let mut blob = Blob::new();
-        blob.set_data(filepath.as_bytes());
-
-        let filename = blob.dump_to_file().unwrap();
-        filename
+    #[test]
+    #[should_panic]
+    fn panic_on_unset_fields() {
+        let commit = Commit::new();
+        commit.convert_to_bytes().unwrap();
     }
 
     #[test]
-    fn create_commit_and_load_then() {
-        let mut index_mock: HashMap<String, Object> = HashMap::new();
-        let utils_filepath = String::from("src/utils.rs");
-        let utils_sha1 = gilltter_add(&utils_filepath);
-        index_mock.insert(
-            utils_filepath.clone(),
-            Object::new(
-                objects::tree::FileType::RegularFile,
-                utils_filepath.to_string(),
-                utils_sha1.clone(),
-            ),
-        );
-
-        let base_filepath = String::from("src/base.rs");
-        let base_sha1 = gilltter_add(&base_filepath);
-        index_mock.insert(
-            base_filepath.clone(),
-            Object::new(
-                objects::tree::FileType::RegularFile,
-                base_filepath.to_string(),
-                base_sha1.clone(),
-            ),
-        );
-
-        // Build a tree
-        let mut tree = Tree::new();
-
-        // TODO: Fix
-        for (path, value) in index_mock.into_iter() {
-            tree.add_object(&path, TreeObject::Blob(value.sha1_pointer));
-        }
-
-        let tree_name = tree.dump_to_file().unwrap();
-
-        #[allow(unused)]
-        let tree = Tree::from_file(Path::new(&format!(".gilltter/objects/{}", tree_name))).unwrap();
-
-        // now build a commit
-        // we need tree, parent, user, message in commit
-        #[allow(unused)]
-        let config = Config::from_file(Path::new(".gilltter/config")).unwrap();
-        let username = String::from("bitch");
-        let email = String::from("idiot@mgial.com");
-
+    fn no_panic_if_fields_set() {
         let mut commit = Commit::new();
-        commit.set_tree_sha(tree_name);
-        commit.set_username(username);
-        commit.set_email(email);
-        commit.set_message("fuck niggas");
+        commit.set_tree_sha(String::from_utf8_lossy(&[87u8; 40]).to_string());
+        commit.set_username("Pencil".to_string());
+        commit.set_email("pedosia@gmail.com".to_string());
+        commit.set_message("Wotofak bitch ya molodoi legenda".to_string());
+        commit.convert_to_bytes().unwrap();
+    }
 
-        commit.convert_to_bytes();
-        let commit_name = commit.dump_to_file().unwrap();
+    #[test]
+    fn commit_to_file() {
+        let mut commit = Commit::new();
+        commit.set_tree_sha(String::from_utf8_lossy(&[87u8; 40]).to_string());
+        commit.set_username("Pencil".to_string());
+        commit.set_email("pedosia@gmail.com".to_string());
+        commit.set_message("Wotofak bitch ya molodoi legenda".to_string());
+        commit.dump_to_file().unwrap();
+    }
 
-        let commit =
-            Commit::from_file(Path::new(&format!(".gilltter/objects/{}", commit_name))).unwrap();
-        println!(
-            "'{}' '{}' '{}'",
-            commit.get_email().unwrap(),
-            commit.get_username().unwrap(),
-            commit.get_message().unwrap()
-        );
+    #[test]
+    fn commit_from_file() {
+        let mut commit = Commit::new();
+        commit.set_tree_sha(String::from_utf8_lossy(&[87u8; 40]).to_string());
+        commit.set_username("Pencil".to_string());
+        commit.set_email("pedosia@gmail.com".to_string());
+        commit.set_message("Wotofak bitch ya molodoi legenda".to_string());
+        let hash = commit.dump_to_file().unwrap();
+
+        let path = Path::new(GILLTTER_PATH)
+            .join(GILLTER_OBJECTS_DIR)
+            .join(hash.as_str());
+        let commit = Commit::from_file(&path).unwrap();
     }
 }

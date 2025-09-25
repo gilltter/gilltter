@@ -131,7 +131,11 @@ impl Tree {
 }
 
 impl ObjectDump for Tree {
-    fn convert_to_bytes(&self) -> Vec<u8> {
+    fn convert_to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+        if self.objects.is_empty() {
+            return Err(anyhow!("Can't convert an empty tree to bytes"));
+        }
+
         let mut bytes = Vec::new();
 
         bytes.extend_from_slice(TREE_TYPE_STRING.as_bytes());
@@ -166,16 +170,16 @@ impl ObjectDump for Tree {
                     bytes.extend_from_slice(hash.as_bytes());
                 }
                 TreeObject::Tree(tree) => {
-                    let tree_hash = utils::generate_hash(&tree.convert_to_bytes());
+                    let tree_hash = utils::generate_hash(&tree.convert_to_bytes()?);
                     bytes.extend_from_slice(tree_hash.as_bytes());
                 }
             }
         }
 
-        bytes
+        Ok(bytes)
     }
     fn dump_to_file(&self) -> anyhow::Result<String> {
-        let tree_content = self.convert_to_bytes();
+        let tree_content = self.convert_to_bytes()?;
         // let filedata = utils::compress(&tree_content)?;
         let filedata = tree_content.clone(); // TODO: Remove this after testing
         let filename = utils::generate_hash(&tree_content);
@@ -210,7 +214,7 @@ impl ObjectPump for Tree {
         let null_pos = data
             .iter()
             .position(|element| *element == "\0".as_bytes()[0])
-            .ok_or(anyhow!("No null terminator in file"))?;
+            .ok_or(anyhow!("No null terminator in file tree"))?;
         let header = &data[0..null_pos];
         let content = &data[null_pos + 1..];
 
@@ -238,7 +242,7 @@ impl ObjectPump for Tree {
             let null_pos = data
                 .iter()
                 .position(|element| *element == *"\0".as_bytes().first().unwrap())
-                .ok_or(anyhow!("No null terminator in file"))?;
+                .ok_or(anyhow!("No null terminator in file tree"))?;
             let filepath = String::from_utf8_lossy(&data[0..null_pos]).to_string();
 
             data = &data[null_pos + 1..]; // We skipped \0 now we at sha1
@@ -283,60 +287,39 @@ impl ObjectPump for Tree {
 
 #[cfg(test)]
 mod tests {
-    use crate::objects::{self, blob::Blob};
-
     use super::*;
 
-    fn gilltter_add(filepath: &str) -> String {
-        let mut file = File::open(filepath).unwrap();
-        let mut contents = Vec::new();
-        file.read_to_end(&mut contents).unwrap();
-
-        let mut blob = Blob::new();
-        blob.set_data(&contents);
-
-        let filename = blob.dump_to_file().unwrap();
-        filename
+    #[test]
+    #[should_panic]
+    fn dump_empty_tree() {
+        let tree = Tree::new();
+        tree.convert_to_bytes().unwrap();
     }
 
     #[test]
-    fn create_tree_dump_then_load() {
-        let mut index_mock: HashMap<String, Object> = HashMap::new();
+    fn dump_nonempty_tree() {
+        let mut tree = Tree::new();
+        tree.add_object(
+            "ddd.txt",
+            TreeObject::Blob(String::from_utf8_lossy(&[87u8; 40]).to_string()),
+        );
+        tree.convert_to_bytes().unwrap();
+    }
 
-        // Imagine git add
-        {
-            let utils_filepath = String::from("src/utils.rs");
-            let utils_sha1 = gilltter_add(&utils_filepath);
-            index_mock.insert(
-                utils_filepath.clone(),
-                Object::new(
-                    objects::tree::FileType::RegularFile,
-                    utils_filepath.to_string(),
-                    utils_sha1.clone(),
-                ),
-            );
+    #[test]
+    fn add_if_not_exists() {
+        let mut tree = Tree::new();
+        let obj = TreeObject::Blob(String::from_utf8_lossy(&[87u8; 40]).to_string());
+        tree.add_object("ddd.txt", obj);
 
-            let base_filepath = String::from("src/base.rs");
-            let base_sha1 = gilltter_add(&base_filepath);
-            index_mock.insert(
-                base_filepath.clone(),
-                Object::new(
-                    objects::tree::FileType::RegularFile,
-                    base_filepath.to_string(),
-                    base_sha1.clone(),
-                ),
-            );
+        let obj = TreeObject::Blob(String::from_utf8_lossy(&[89u8; 40]).to_string());
+        tree.add_object_if_not_exists("ddd.txt", || obj);
 
-            // Build a tree
-            let mut tree = Tree::new();
-
-            for (position, value) in index_mock.into_iter() {
-                tree.add_object(&position, TreeObject::Blob(value.sha1_pointer));
-            }
-
-            let name = tree.dump_to_file().unwrap();
-
-            Tree::from_file(Path::new(&format!(".gilltter/objects/{}", name))).unwrap();
+        let obj = tree.get_object("ddd.txt").unwrap();
+        if let TreeObject::Blob(data) = obj {
+            let a = String::from_utf8_lossy(&[87u8; 40]).to_string();
+            let b = data.to_string();
+            assert!(a == b)
         }
     }
 }
