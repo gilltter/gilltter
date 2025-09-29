@@ -42,7 +42,14 @@ enum Commands {
 
     #[command(arg_required_else_help = true)]
     Revert {
+        // go back to a commit and change the work dir
         commit_hash: PathBuf,
+    },
+
+    #[command(arg_required_else_help = true)]
+    Reset {
+        // go back to a commit and dont change the working dir
+        value: i32, // accepts values like HEAD-[1,2,3,4,5,6]
     },
 }
 
@@ -101,6 +108,11 @@ fn main() {
         Commands::Revert { commit_hash } => {
             if let Err(why) = commands::revert::revert(&commit_hash) {
                 eprintln!("Revert failed, i think project is fucked up now: {}", why);
+            }
+        }
+        Commands::Reset { value } => {
+            if let Err(why) = commands::reset::reset(value) {
+                eprintln!("Reset failed: {}", why);
             }
         }
     }

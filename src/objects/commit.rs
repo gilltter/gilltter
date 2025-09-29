@@ -103,8 +103,7 @@ impl ObjectDump for Commit {
             ));
         }
         let mut bytes = Vec::new();
-
-        bytes.extend_from_slice(COMMIT_TYPE_STRING.as_bytes());
+        // bytes.extend_from_slice(COMMIT_TYPE_STRING.as_bytes());
         // bytes.extend_from_slice(format!(" {}\0", bytes_cnt).as_bytes());
         // Tree setup
         bytes.extend_from_slice(
@@ -122,14 +121,22 @@ impl ObjectDump for Commit {
         }
 
         // User info setup + current date
-        let seconds_since_epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap(); // it shouldnt fail right
+        let seconds_since_epoch = if let Some(time) = self.secs_since_epoch {
+            time
+        } else {
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+        };
+
         // timestamp is utc
         bytes.extend_from_slice(
             format!(
                 "author {} {} {} ",
                 self.username.as_ref().unwrap(),
                 self.email.as_ref().unwrap(),
-                seconds_since_epoch.as_secs()
+                seconds_since_epoch
             )
             .as_bytes(),
         );
@@ -138,11 +145,12 @@ impl ObjectDump for Commit {
         bytes.extend_from_slice(format!("msg {}", self.message.as_ref().unwrap()).as_bytes());
 
         let bytes_cnt = bytes.len();
-        let v = bytes.split_off(COMMIT_TYPE_STRING.len());
-        bytes.extend_from_slice(&format!(" {}\0", bytes_cnt).as_bytes());
-        bytes.extend(v.iter());
+        let mut v = format!("{} {}\0", COMMIT_TYPE_STRING, bytes_cnt)
+            .as_bytes()
+            .to_owned();
+        v.extend(bytes.iter());
 
-        Ok(bytes)
+        Ok(v)
     }
     fn dump_to_file(&self) -> anyhow::Result<String> {
         let commit_content = self.convert_to_bytes()?;

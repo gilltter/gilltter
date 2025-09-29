@@ -144,7 +144,10 @@ fn traverse_head_get_files() -> anyhow::Result<Vec<IndexEntry>> {
     let mut head_files: Vec<IndexEntry> = Vec::new();
     if !head_commit_bytes.is_empty() {
         // Нужно пройтись по хеду и добавить файлы в head_file, путь ставить относительно root_path
-        let commit_sha = String::from_utf8_lossy(&head_commit_bytes);
+        let commit_sha = String::from_utf8_lossy(&head_commit_bytes)
+            .trim()
+            .to_string();
+
         let commit = Commit::from_file(
             &Path::new(GILLTTER_PATH)
                 .join(GILLTER_OBJECTS_DIR)
@@ -264,7 +267,7 @@ pub(crate) fn gilltter_status() -> anyhow::Result<()> {
     let work_tree_files = traverse_dirs(dir)?;
 
     // Сначала найдем untracked файлы => untracked файл это значит он есть в ворк три но нет в index
-    let untracked_files = get_untracked(&work_tree_files, &index);
+    // let untracked_files = get_untracked(&work_tree_files, &index);
 
     // Теперь с оставшимися нужно сделать unstaged
     let unstaged_files = get_unstaged(&work_tree_files, &index);
@@ -298,11 +301,11 @@ pub(crate) fn gilltter_status() -> anyhow::Result<()> {
     }
     println!();
 
-    println!("{}", "==== Untracked Files ====".magenta().bold());
-    for entry in &untracked_files {
-        println!("  {} {:?}", "untracked:".magenta(), entry.filename);
-    }
-    println!();
+    // println!("{}", "==== Untracked Files ====".magenta().bold());
+    // for entry in &untracked_files {
+    //     println!("  {} {:?}", "untracked:".magenta(), entry.filename);
+    // }
+    // println!();
 
     Ok(())
 }
