@@ -61,21 +61,34 @@ impl IndexEntry {
             sha1_hash,
         }
     }
-    pub fn convert_to_bytes(&self) -> Vec<u8> {
+    pub fn convert_to_bytes(&self) -> anyhow::Result<Vec<u8>> {
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(&self.index_type.to_bytes());
-        bytes.extend_from_slice(
-            format!(
-                " {} {} {} {} {}\n",
-                self.ctime,
-                self.mtime,
-                self.file_size,
-                self.filename.to_str().expect("No filename"),
-                self.sha1_hash
-            )
-            .as_bytes(),
-        ); // TODO: Get rid of strings and make it compact and optimized (binary format)
-        bytes
+
+        write!(
+            &mut bytes,
+            "{} {} {} {} {} {}\n",
+            std::str::from_utf8(&self.index_type.to_bytes())?,
+            self.ctime,
+            self.mtime,
+            self.file_size,
+            self.filename
+                .to_str()
+                .ok_or(anyhow!("Could not convert filename to str"))?,
+            self.sha1_hash
+        )?;
+
+        // bytes.extend_from_slice(
+        //     format!(
+        //         " {} {} {} {} {}\n",
+        //         self.ctime,
+        //         self.mtime,
+        //         self.file_size,
+        //         self.filename.to_str().expect("No filename"),
+        //         self.sha1_hash
+        //     )
+        //     .as_bytes(),
+        // ); // TODO: Get rid of strings and make it compact and optimized (binary format)
+        Ok(bytes)
     }
 }
 
@@ -164,7 +177,7 @@ impl ObjectDump for Index {
         }
         let mut bytes = Vec::new();
         for index in &self.indices {
-            bytes.extend_from_slice(&index.convert_to_bytes());
+            bytes.extend_from_slice(&index.convert_to_bytes()?);
         }
         Ok(bytes)
     }
@@ -179,5 +192,50 @@ impl ObjectDump for Index {
         index_file.write_all(&compressed_content)?;
         index_file.flush()?;
         Ok(path.to_string_lossy().to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::utils;
+
+    use super::*;
+
+    #[test]
+    fn dump_and_pump() {
+        let mut index = Index::new();
+        index.add(IndexEntry::new(
+            111,
+            111,
+            2222,
+            IndexType::RegularFile,
+            PathBuf::from_str("fuck.txt").unwrap(),
+            String::from_utf8([81u8; 40].to_vec()).unwrap(),
+        ));
+        index.add(IndexEntry::new(
+            121,
+            131,
+            3222,
+            IndexType::RegularFile,
+            PathBuf::from_str("fuck2.txt").unwrap(),
+            String::from_utf8([81u8; 40].to_vec()).unwrap(),
+        ));
+        index.add(IndexEntry::new(
+            111,
+            111,
+            2222,
+            IndexType::RegularFile,
+            PathBuf::from_str("yompta.zov").unwrap(),
+            String::from_utf8([82u8; 40].to_vec()).unwrap(),
+        ));
+        let index_bytes = index.convert_to_bytes().unwrap();
+        let hash = utils::generate_hash(&index_bytes);
+        println!("Dumped: '{}'", std::str::from_utf8(&index_bytes).unwrap());
+
+        let index = Index::from_raw_data(&index_bytes).unwrap();
+        let index_bytes = index.convert_to_bytes().unwrap();
+        let hash2 = utils::generate_hash(&index_bytes);
+        println!("Pumped: '{}'", std::str::from_utf8(&index_bytes).unwrap());
+        assert_eq!(hash, hash2);
     }
 }
