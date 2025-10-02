@@ -34,7 +34,7 @@ impl Config {
     // TODO: Handle all Config::parse() cases!!, then base.rs
     pub fn parse(data: String) -> anyhow::Result<Config> {
         let mut config = Config::new();
-        let mut current_category = String::from("Unnamed");
+        let mut current_category = String::from("unnamed");
         let reader = BufReader::new(Cursor::new(data));
 
         for line in reader.lines() {
@@ -43,12 +43,12 @@ impl Config {
 
             if line.starts_with('[') && line.ends_with(']') {
                 let category_name = &line[1..line.len() - 1];
-                current_category = category_name.to_owned();
+                current_category = category_name.to_owned().to_lowercase();
             } else {
                 if let Some(equal_pos) = line.chars().position(|ch| ch == '=') {
                     let name = &line[0..equal_pos];
                     let value = &line[equal_pos + 1..];
-                    config.add(&current_category, name, value);
+                    config.add(&current_category, &name.to_lowercase(), value);
                 } else {
                     return Err(anyhow!("Malformed line: {}", line));
                 }
@@ -60,22 +60,22 @@ impl Config {
     /// category_name must be CamelCase, name is also CamelCase
     pub fn add(&mut self, category_name: &str, name: &str, value: &str) {
         self.variables
-            .entry(category_name.to_owned())
+            .entry(category_name.to_lowercase())
             .or_insert(HashMap::new())
-            .insert(name.to_owned(), value.to_owned());
+            .insert(name.to_lowercase(), value.to_owned());
     }
 
     /// This is case sensitive: category_name must be CamelCase, name is also CamelCase
     pub fn get(&self, category_name: &str, name: &str) -> Option<String> {
-        if let Some(vars) = self.variables.get(category_name) {
-            return vars.get(name).map(|s| s.to_string());
+        if let Some(vars) = self.variables.get(&category_name.to_lowercase()) {
+            return vars.get(&name.to_lowercase()).map(|s| s.to_string());
         }
         None
     }
     pub fn get_int(&self, category_name: &str, name: &str) -> Option<i32> {
         self.variables
-            .get(category_name)
-            .and_then(|vars| vars.get(name).and_then(|s| s.parse::<i32>().ok()))
+            .get(&category_name.to_lowercase())
+            .and_then(|vars| vars.get(&name.to_lowercase()).and_then(|s| s.parse::<i32>().ok()))
     }
 }
 
