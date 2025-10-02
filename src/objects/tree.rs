@@ -1,7 +1,7 @@
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     fs::File,
-    io::{Read, Write},
+    io::{BufRead, BufReader, Read, Write},
     path::Path,
 };
 
@@ -70,13 +70,13 @@ pub enum TreeObject {
 #[derive(Clone, Debug)]
 pub struct Tree {
     sha1_hash: String, // if it is a loaded object from tree parser, just set this field, kinda stupid, but will work for now
-    pub objects: HashMap<String, TreeObject>, // path (local) -> Object
+    pub objects: BTreeMap<String, TreeObject>, // path (local) -> Object
 }
 
 impl Tree {
     pub fn new() -> Self {
         Self {
-            objects: HashMap::new(),
+            objects: BTreeMap::new(),
             sha1_hash: String::new(),
         }
     }
@@ -122,7 +122,7 @@ impl Tree {
         self.objects.get_mut(filepath)
     }
 
-    pub fn get_objects(&self) -> HashMap<String, TreeObject> {
+    pub fn get_objects(&self) -> BTreeMap<String, TreeObject> {
         self.objects.clone()
     }
     pub fn object_exists(&self, filepath: &str) -> bool {
@@ -136,47 +136,41 @@ impl ObjectDump for Tree {
             return Err(anyhow!("Can't convert an empty tree to bytes"));
         }
 
+        let mut tree_bytes = Vec::new();
+        tree_bytes.extend_from_slice(TREE_TYPE_STRING.as_bytes());
+        tree_bytes.extend_from_slice(SPACE_STR);
+
         let mut bytes = Vec::new();
-
-        bytes.extend_from_slice(TREE_TYPE_STRING.as_bytes());
-        bytes.extend_from_slice(SPACE_STR);
-
-        let mut bytes_count = 0;
-
-        for (path, _) in self.objects.iter() {
-            bytes_count += 6; // file type
-            bytes_count += 1; // space
-            bytes_count += path.len();
-            bytes_count += 1; // \0 after path
-            bytes_count += 40; // sha-1 size in hex
-        }
-
-        bytes.extend_from_slice(format!("{}\0", bytes_count).as_bytes());
-
-        for (path, value) in self.objects.iter() {
+        for (path, value) in &self.objects {
+            let mut type_bytes = Vec::new();
             match value {
                 TreeObject::Blob(_) => {
-                    bytes.extend_from_slice(&FileType::RegularFile.to_bytes());
+                    type_bytes = FileType::RegularFile.to_bytes();
                 }
                 TreeObject::Tree(_) => {
-                    bytes.extend_from_slice(&FileType::Directory.to_bytes());
+                    type_bytes = FileType::Directory.to_bytes();
                 }
             }
-            bytes.extend_from_slice(SPACE_STR);
-            bytes.extend_from_slice(path.as_bytes());
-            bytes.extend_from_slice(b"\0");
+
+            let mut obj_hash = String::new();
             match value {
                 TreeObject::Blob(hash) => {
-                    bytes.extend_from_slice(hash.as_bytes());
+                    obj_hash = hash.to_string();
                 }
                 TreeObject::Tree(tree) => {
                     let tree_hash = utils::generate_hash(&tree.convert_to_bytes()?);
-                    bytes.extend_from_slice(tree_hash.as_bytes());
+                    obj_hash = tree_hash;
                 }
             }
+
+            bytes.extend_from_slice(&type_bytes);
+            bytes.extend_from_slice(format!(" {} {}\n", path, obj_hash).as_bytes());
         }
 
-        Ok(bytes)
+        tree_bytes.extend_from_slice(format!("{}\n", bytes.len()).as_bytes());
+        tree_bytes.extend(bytes.iter());
+
+        Ok(tree_bytes)
     }
     fn dump_to_file(&self) -> anyhow::Result<String> {
         let tree_content = self.convert_to_bytes()?;
@@ -211,58 +205,54 @@ pub fn dump_tree_recursive(tree: &Tree) -> anyhow::Result<()> {
 impl ObjectPump for Tree {
     fn from_raw_data(data: &[u8]) -> anyhow::Result<Self> {
         let mut tree = Tree::new();
-        let null_pos = data
-            .iter()
-            .position(|element| *element == "\0".as_bytes()[0])
-            .ok_or(anyhow!("No null terminator in file tree"))?;
-        let header = &data[0..null_pos];
-        let content = &data[null_pos + 1..];
 
-        if &header[0..TREE_TYPE_STRING.len()] != TREE_TYPE_STRING.as_bytes() {
-            return Err(anyhow!("Object type is incorrect"));
+        let mut reader = BufReader::new(data);
+
+        let mut tree_info = String::new();
+        reader.read_line(&mut tree_info)?;
+        let tree_info_parts: Vec<&str> = tree_info.split(' ').collect();
+        if tree_info_parts.len() != 2 {
+            return Err(anyhow!("Expected 2 values in tree header"));
+        }
+        let object_type = tree_info_parts.first().unwrap(); // safe
+        if *object_type != "tree" {
+            return Err(anyhow!("Could not parse obj header"));
         }
 
-        // TODO: Incorrectly counted
-        let size_tree_bytes = &header[TREE_TYPE_STRING.len() + 1..null_pos];
-        let _size_tree: u32 = String::from_utf8_lossy(size_tree_bytes)
-            .trim()
-            .parse::<u32>()?;
-
-        // may wanna check if data == size tree bytes
-        let mut data = content;
-        while !data.is_empty() {
-            // Extract file type
-            let obj_type_bytes = &data[0..6];
-            let obj_type =
-                FileType::from_bytes(obj_type_bytes).ok_or(anyhow!("Weird file type"))?;
-
-            // Move to filename
-            data = &data[7..];
-
-            let null_pos = data
-                .iter()
-                .position(|element| *element == *"\0".as_bytes().first().unwrap())
-                .ok_or(anyhow!("No null terminator in file tree"))?;
-            let filepath = String::from_utf8_lossy(&data[0..null_pos]).to_string();
-
-            data = &data[null_pos + 1..]; // We skipped \0 now we at sha1
-            if data.len() < 40 {
-                return Err(anyhow!("Tree is weirdly formatted"));
+        let tree_bytes_size = tree_info_parts.last().unwrap().trim().parse::<usize>()?;
+        let mut tree_bytes_cnt: usize = 0;
+        for line in reader.lines() {
+            if let Err(why) = line {
+                return Err(anyhow!("Could not read line: {}", why));
             }
+            let line = line?;
+            tree_bytes_cnt += line.len() + 1; // for new line
 
-            let sha1_pointer = String::from_utf8_lossy(&data[0..40]).to_string(); // sha1 is 40 bytes
+            let line_parts = line.split(' ').collect::<Vec<&str>>();
+            if line_parts.len() != 3 {
+                return Err(anyhow!("Format error in object lines in tree"));
+            }
+            let obj_type_str = line_parts[0];
+            let obj_path_str = line_parts[1];
+            let obj_hash_str = line_parts[2];
+
+            let obj_type = FileType::from_bytes(obj_type_str.as_bytes())
+                .ok_or(anyhow!("Invalid object type"))?;
             match obj_type {
                 FileType::RegularFile | FileType::ExecutableFile | FileType::SymbolicLink => {
-                    tree.add_object(&filepath, TreeObject::Blob(sha1_pointer));
+                    tree.add_object(obj_path_str, TreeObject::Blob(obj_hash_str.to_string()));
                 }
                 FileType::Directory => {
                     let mut to_be_loaded_tree = Tree::new();
-                    to_be_loaded_tree.set_hash(&sha1_pointer).unwrap(); // Can't possibly fucking panic
-                    tree.add_object(&filepath, TreeObject::Tree(to_be_loaded_tree)); // TODO: How to load this tree
+                    to_be_loaded_tree.set_hash(obj_hash_str)?; // Can't possibly fucking panic
+                    tree.add_object(obj_path_str, TreeObject::Tree(to_be_loaded_tree)); // TODO: How to load this tree properly
                 }
             }
+        }
 
-            data = &data[40..];
+        println!("WHAT THE FUCK: {} {}", tree_bytes_size, tree_bytes_cnt);
+        if tree_bytes_cnt != tree_bytes_size {
+            return Err(anyhow!("Tree size is not correct"));
         }
 
         Ok(tree)
@@ -321,5 +311,28 @@ mod tests {
             let b = data.to_string();
             assert!(a == b)
         }
+    }
+
+    #[test]
+    fn dump_and_pump() {
+        let mut tree = Tree::new();
+        let obj = TreeObject::Blob(String::from_utf8_lossy(&[87u8; 40]).to_string());
+        tree.add_object("ddd.txt", obj);
+
+        let obj = TreeObject::Blob(String::from_utf8_lossy(&[89u8; 40]).to_string());
+        tree.add_object("ttt.txt", obj);
+
+        let obj = TreeObject::Blob(String::from_utf8_lossy(&[84u8; 40]).to_string());
+        tree.add_object("zz.txt", obj);
+
+        let tree_bytes = tree.convert_to_bytes().unwrap();
+        println!("Dumped tree: '{}'", String::from_utf8_lossy(&tree_bytes));
+        let hash_dumped = utils::generate_hash(&tree_bytes);
+
+        let tree = Tree::from_raw_data(&tree_bytes).unwrap();
+        let tree_bytes = tree.convert_to_bytes().unwrap();
+        println!("Pumped tree: '{}'", String::from_utf8_lossy(&tree_bytes));
+        let hash_pumped = utils::generate_hash(&tree_bytes);
+        assert_eq!(hash_dumped, hash_pumped)
     }
 }

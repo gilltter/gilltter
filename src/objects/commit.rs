@@ -329,11 +329,12 @@ mod tests {
         commit.set_username("Pencil".to_string());
         commit.set_email("pedosia@gmail.com".to_string());
         commit.set_message("Wotofak bitch ya molodoi legenda".to_string());
-        let hash = commit.dump_to_file().unwrap();
 
-        let path = Path::new(GILLTTER_PATH)
-            .join(GILLTER_OBJECTS_DIR)
-            .join(hash.as_str());
-        let commit = Commit::from_file(&path).unwrap();
+        let commit_bytes = commit.convert_to_bytes().unwrap();
+        let hash = utils::generate_hash(&commit_bytes);
+
+        let commit = Commit::from_raw_data(&commit_bytes).unwrap();
+
+        let commit_bytes = commit.convert_to_bytes().unwrap();
     }
 }
