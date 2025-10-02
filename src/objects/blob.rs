@@ -113,14 +113,12 @@ impl ObjectDump for Blob {
     // Blob cant fail here
     fn convert_to_bytes(&self) -> anyhow::Result<Vec<u8>> {
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(
-            format!(
-                "{} {}\0",
-                String::from_utf8_lossy(BLOB_TYPE_STRING),
-                self.content.len()
-            )
-            .as_bytes(),
-        );
+        write!(
+            &mut bytes,
+            "{} {}\0",
+            String::from_utf8_lossy(BLOB_TYPE_STRING),
+            self.content.len()
+        )?;
         bytes.extend_from_slice(&self.content);
         Ok(bytes)
     }

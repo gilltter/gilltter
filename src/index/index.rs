@@ -1,18 +1,11 @@
 use crate::{
-    base::{self, GILLTER_CONFIG_FILE, GILLTER_HEAD_FILE, GILLTTER_INDEX_FILE, GILLTTER_PATH},
-    config::{self, Config},
-    objects::{
-        ObjectDump, ObjectPump,
-        commit::Commit,
-        tree::{self, Tree, TreeObject},
-    },
-    utils,
+    base::{GILLTTER_INDEX_FILE, GILLTTER_PATH},
+    objects::{ObjectDump, ObjectPump},
 };
 use anyhow::anyhow;
 use std::{
     fs::{File, OpenOptions},
-    io::{BufRead, BufReader, Cursor, Read, Seek, SeekFrom, Write},
-    os::unix::fs::MetadataExt,
+    io::{BufRead, BufReader, Cursor, Read, Write},
     path::{Path, PathBuf},
     str::FromStr,
 };

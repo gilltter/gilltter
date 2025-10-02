@@ -137,8 +137,7 @@ impl ObjectDump for Tree {
         }
 
         let mut tree_bytes = Vec::new();
-        tree_bytes.extend_from_slice(TREE_TYPE_STRING.as_bytes());
-        tree_bytes.extend_from_slice(SPACE_STR);
+        write!(&mut tree_bytes, "{} ", TREE_TYPE_STRING)?;
 
         let mut bytes = Vec::new();
         for (path, value) in &self.objects {
@@ -163,11 +162,16 @@ impl ObjectDump for Tree {
                 }
             }
 
-            bytes.extend_from_slice(&type_bytes);
-            bytes.extend_from_slice(format!(" {} {}\n", path, obj_hash).as_bytes());
+            write!(
+                &mut bytes,
+                "{} {} {}\n",
+                std::str::from_utf8(&type_bytes)?,
+                path,
+                obj_hash
+            )?;
         }
 
-        tree_bytes.extend_from_slice(format!("{}\n", bytes.len()).as_bytes());
+        write!(&mut tree_bytes, "{}\n", bytes.len())?;
         tree_bytes.extend(bytes.iter());
 
         Ok(tree_bytes)
@@ -250,7 +254,6 @@ impl ObjectPump for Tree {
             }
         }
 
-        println!("WHAT THE FUCK: {} {}", tree_bytes_size, tree_bytes_cnt);
         if tree_bytes_cnt != tree_bytes_size {
             return Err(anyhow!("Tree size is not correct"));
         }
@@ -326,12 +329,10 @@ mod tests {
         tree.add_object("zz.txt", obj);
 
         let tree_bytes = tree.convert_to_bytes().unwrap();
-        println!("Dumped tree: '{}'", String::from_utf8_lossy(&tree_bytes));
         let hash_dumped = utils::generate_hash(&tree_bytes);
 
         let tree = Tree::from_raw_data(&tree_bytes).unwrap();
         let tree_bytes = tree.convert_to_bytes().unwrap();
-        println!("Pumped tree: '{}'", String::from_utf8_lossy(&tree_bytes));
         let hash_pumped = utils::generate_hash(&tree_bytes);
         assert_eq!(hash_dumped, hash_pumped)
     }

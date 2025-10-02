@@ -1,7 +1,7 @@
 use std::{
     fs::File,
     io::{Read, Write},
-    path::{self, Path},
+    path::Path,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -93,61 +93,46 @@ impl Commit {
 
 impl ObjectDump for Commit {
     fn convert_to_bytes(&self) -> anyhow::Result<Vec<u8>> {
-        if self.tree_sha.is_none()
-            || self.username.is_none()
-            || self.email.is_none()
-            || self.message.is_none()
-        {
-            return Err(anyhow!(
-                "Mandatory fields are not set, can't convert this commit"
-            ));
-        }
+        let tree_sha = self
+            .tree_sha
+            .as_ref()
+            .ok_or(anyhow!("tree_sha is not set"))?;
+        let username = self
+            .username
+            .as_ref()
+            .ok_or(anyhow!("username is not set"))?;
+        let email = self.email.as_ref().ok_or(anyhow!("email is not set"))?;
+        let message = self.message.as_ref().ok_or(anyhow!("message is not set"))?;
+
+        // let mut bytes = Vec::new();
         let mut bytes = Vec::new();
-        // bytes.extend_from_slice(COMMIT_TYPE_STRING.as_bytes());
-        // bytes.extend_from_slice(format!(" {}\0", bytes_cnt).as_bytes());
         // Tree setup
-        bytes.extend_from_slice(
-            format!(
-                "{} {}",
-                tree::TREE_TYPE_STRING,
-                self.tree_sha.as_ref().unwrap()
-            )
-            .as_bytes(),
-        );
+        write!(&mut bytes, "{} {}", tree::TREE_TYPE_STRING, tree_sha)?;
 
         // Parent commit setup (if there is one)
         if let Some(parent_sha) = self.parent_commit_sha.as_ref() {
-            bytes.extend_from_slice(format!("parent {}", parent_sha).as_bytes());
+            write!(&mut bytes, "parent {}", parent_sha)?;
         }
 
         // User info setup + current date
-        let seconds_since_epoch = if let Some(time) = self.secs_since_epoch {
-            time
-        } else {
+        let seconds_since_epoch = self.secs_since_epoch.unwrap_or_else(|| {
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_secs()
-        };
+        });
 
         // timestamp is utc
-        bytes.extend_from_slice(
-            format!(
-                "author {} {} {} ",
-                self.username.as_ref().unwrap(),
-                self.email.as_ref().unwrap(),
-                seconds_since_epoch
-            )
-            .as_bytes(),
-        );
-
-        // Message
-        bytes.extend_from_slice(format!("msg {}", self.message.as_ref().unwrap()).as_bytes());
+        write!(
+            &mut bytes,
+            "author {} {} {} ",
+            username, email, seconds_since_epoch
+        )?;
+        write!(&mut bytes, "msg {}", message)?;
 
         let bytes_cnt = bytes.len();
-        let mut v = format!("{} {}\0", COMMIT_TYPE_STRING, bytes_cnt)
-            .as_bytes()
-            .to_owned();
+        let mut v = Vec::new();
+        write!(&mut v, "{} {}\0", COMMIT_TYPE_STRING, bytes_cnt)?;
         v.extend(bytes.iter());
 
         Ok(v)
@@ -171,7 +156,6 @@ impl ObjectDump for Commit {
 }
 
 impl ObjectPump for Commit {
-    // TODO: Range checking
     fn from_raw_data(data: &[u8]) -> anyhow::Result<Self> {
         let mut commit = Commit::new();
 
@@ -191,6 +175,14 @@ impl ObjectPump for Commit {
             .parse::<u32>()?;
 
         let mut data = content;
+
+        if commit_size as usize != data.len() {
+            return Err(anyhow!(
+                "Commti size does not match {} != {}",
+                commit_size,
+                data.len()
+            ));
+        }
 
         // Get tree
         let tree_type_str = &data[0..TREE_TYPE_STRING.len()];
@@ -319,7 +311,7 @@ mod tests {
         commit.set_username("Pencil".to_string());
         commit.set_email("pedosia@gmail.com".to_string());
         commit.set_message("Wotofak bitch ya molodoi legenda".to_string());
-        commit.dump_to_file().unwrap();
+        commit.convert_to_bytes().unwrap();
     }
 
     #[test]
@@ -331,10 +323,13 @@ mod tests {
         commit.set_message("Wotofak bitch ya molodoi legenda".to_string());
 
         let commit_bytes = commit.convert_to_bytes().unwrap();
+        println!("Dumped: '{}'", std::str::from_utf8(&commit_bytes).unwrap());
         let hash = utils::generate_hash(&commit_bytes);
 
         let commit = Commit::from_raw_data(&commit_bytes).unwrap();
-
         let commit_bytes = commit.convert_to_bytes().unwrap();
+        println!("Pumped: '{}'", std::str::from_utf8(&commit_bytes).unwrap());
+        let hash2 = utils::generate_hash(&commit_bytes);
+        assert_eq!(hash, hash2);
     }
 }
