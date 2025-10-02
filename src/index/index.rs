@@ -76,18 +76,6 @@ impl IndexEntry {
                 .ok_or(anyhow!("Could not convert filename to str"))?,
             self.sha1_hash
         )?;
-
-        // bytes.extend_from_slice(
-        //     format!(
-        //         " {} {} {} {} {}\n",
-        //         self.ctime,
-        //         self.mtime,
-        //         self.file_size,
-        //         self.filename.to_str().expect("No filename"),
-        //         self.sha1_hash
-        //     )
-        //     .as_bytes(),
-        // ); // TODO: Get rid of strings and make it compact and optimized (binary format)
         Ok(bytes)
     }
 }
