@@ -140,8 +140,8 @@ impl ObjectDump for Commit {
     fn dump_to_file(&self) -> anyhow::Result<String> {
         let commit_content = self.convert_to_bytes()?;
         let filename = utils::generate_hash(&commit_content);
-        // let filedata = utils::compress(&commit_content)?;
-        let filedata = commit_content; // TODO: Remove after testing
+        let filedata = utils::compress(&commit_content)?;
+        // let filedata = commit_content; // TODO: Remove after testing
 
         let path = Path::new(GILLTTER_PATH)
             .join(GILLTER_OBJECTS_DIR)
@@ -271,8 +271,8 @@ impl ObjectPump for Commit {
                 let mut file_contents = Vec::new();
                 file.read_to_end(&mut file_contents)?;
 
-                // let data = utils::decompress(&file_contents)?;
-                let data = file_contents;
+                let data = utils::decompress(&file_contents)?;
+                // let data = file_contents;
                 return Commit::from_raw_data(&data);
             }
             Err(why) => {

@@ -1,5 +1,5 @@
 use std::fs::{self, File};
-use std::io::{BufRead, BufReader, ErrorKind, Read};
+use std::io::{ErrorKind, Read};
 use std::path::Path;
 
 use crate::objects::ObjectDump;

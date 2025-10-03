@@ -1,6 +1,7 @@
 use crate::{
     base::{GILLTTER_INDEX_FILE, GILLTTER_PATH},
     objects::{ObjectDump, ObjectPump},
+    utils,
 };
 use anyhow::anyhow;
 use std::{
@@ -145,8 +146,8 @@ impl ObjectPump for Index {
                 let mut file_contents = Vec::new();
                 file.read_to_end(&mut file_contents).unwrap();
 
-                // let data = utils::decompress(&file_contents)?;
-                let data = file_contents;
+                let data = utils::decompress(&file_contents)?;
+                // let data = file_contents;
                 return Self::from_raw_data(&data);
             }
             Err(why) => {
@@ -174,8 +175,8 @@ impl ObjectDump for Index {
     }
     fn dump_to_file(&self) -> anyhow::Result<String> {
         let index_content = self.convert_to_bytes()?;
-        // let compressed_content = utils::compress(&index_content)?;
-        let compressed_content = index_content; // TODO: Remove after testing
+        let compressed_content = utils::compress(&index_content)?;
+        // let compressed_content = index_content; // TODO: Remove after testing
 
         let path = Path::new(GILLTTER_PATH).join(GILLTTER_INDEX_FILE);
         let mut index_file = OpenOptions::new().write(true).truncate(true).open(&path)?; // No point in using 'create(true)', since files are there at this point

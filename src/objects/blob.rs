@@ -45,8 +45,8 @@ impl ObjectPump for Blob {
                 let mut file_contents = Vec::new();
                 file.read_to_end(&mut file_contents)?;
 
-                // let data = utils::decompress(&file_contents)?;
-                let data = file_contents;
+                let data = utils::decompress(&file_contents)?;
+                // let data = file_contents;
                 return Blob::from_raw_data(&data);
             }
             Err(why) => {
@@ -125,8 +125,8 @@ impl ObjectDump for Blob {
 
     fn dump_to_file(&self) -> anyhow::Result<String> {
         let blob_content = self.convert_to_bytes()?;
-        // let filedata = utils::compress(&blob_content)?;
-        let filedata = blob_content.clone(); // TODO: Remove after testing
+        let filedata = utils::compress(&blob_content)?;
+        // let filedata = blob_content.clone(); // TODO: Remove after testing
         let filename = utils::generate_hash(&blob_content);
 
         let path = Path::new(GILLTTER_PATH)

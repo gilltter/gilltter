@@ -1,15 +1,13 @@
 use anyhow::anyhow;
 use colored::Colorize;
 use std::{
-    collections::{BTreeSet, HashSet},
-    ffi::OsStr,
     io::Read,
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
 };
 
 use crate::{
-    base::{self, GILLTER_HEAD_FILE, GILLTER_OBJECTS_DIR, GILLTTER_INDEX_FILE, GILLTTER_PATH},
+    base::{GILLTER_HEAD_FILE, GILLTER_OBJECTS_DIR, GILLTTER_INDEX_FILE, GILLTTER_PATH},
     ignore,
     index::index::{Index, IndexEntry, IndexType},
     objects::{
@@ -129,7 +127,6 @@ fn get_deleted_files(
             .iter()
             .find(|val| val.filename == head_entry.filename);
         if index_entry.is_none() {
-            println!("HEREJKLJKLS:JKL:FSLJK:DFSDJKL:FDJKL:DFJKL:");
             // File is deleted and staged
             deleted_files.push(head_entry.clone());
         }

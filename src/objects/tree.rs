@@ -9,7 +9,7 @@ use anyhow::anyhow;
 
 use crate::{
     base::{GILLTER_OBJECTS_DIR, GILLTTER_PATH},
-    objects::{ObjectDump, ObjectPump, SPACE_STR},
+    objects::{ObjectDump, ObjectPump},
     utils,
 };
 
@@ -178,8 +178,8 @@ impl ObjectDump for Tree {
     }
     fn dump_to_file(&self) -> anyhow::Result<String> {
         let tree_content = self.convert_to_bytes()?;
-        // let filedata = utils::compress(&tree_content)?;
-        let filedata = tree_content.clone(); // TODO: Remove this after testing
+        let filedata = utils::compress(&tree_content)?;
+        // let filedata = tree_content.clone(); // TODO: Remove this after testing
         let filename = utils::generate_hash(&tree_content);
 
         let path = Path::new(GILLTTER_PATH)
@@ -266,8 +266,8 @@ impl ObjectPump for Tree {
                 let mut file_contents = Vec::new();
                 file.read_to_end(&mut file_contents)?;
 
-                // let data = utils::decompress(&file_contents)?; // TODO: corrupt deflate stream if empty
-                let data = file_contents;
+                let data = utils::decompress(&file_contents)?; // TODO: corrupt deflate stream if empty
+                // let data = file_contents;
                 return Tree::from_raw_data(&data);
             }
             Err(why) => {
