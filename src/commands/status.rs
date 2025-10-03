@@ -2,6 +2,7 @@ use anyhow::anyhow;
 use colored::Colorize;
 use std::{
     collections::{BTreeSet, HashSet},
+    ffi::OsStr,
     io::Read,
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
@@ -9,6 +10,7 @@ use std::{
 
 use crate::{
     base::{self, GILLTER_HEAD_FILE, GILLTER_OBJECTS_DIR, GILLTTER_INDEX_FILE, GILLTTER_PATH},
+    ignore,
     index::index::{Index, IndexEntry, IndexType},
     objects::{
         ObjectPump,
@@ -23,12 +25,16 @@ static DONT_TRACK_DIRS: &[&str] = &[".gilltter"];
 fn traverse_dirs_impl(
     entries: &mut Vec<IndexEntry>,
     path: std::path::PathBuf,
-    // ignore_files: &Vec<String>,
+    ignore_files: &Vec<String>,
 ) -> anyhow::Result<()> {
     let dir = path;
     let root_path = std::env::current_dir()?;
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
+        if ignore::should_ignore(&entry.file_name(), &ignore_files)? {
+            continue;
+        }
+
         let filetype = entry.file_type()?;
         if filetype.is_file() {
             let meta = std::fs::metadata(entry.path())?;
@@ -53,7 +59,7 @@ fn traverse_dirs_impl(
             ) {
                 continue;
             }
-            traverse_dirs_impl(entries, entry.path())?;
+            traverse_dirs_impl(entries, entry.path(), ignore_files)?;
         }
     }
     Ok(())
@@ -61,8 +67,8 @@ fn traverse_dirs_impl(
 
 pub fn traverse_dirs(path: std::path::PathBuf) -> anyhow::Result<Vec<IndexEntry>> {
     let mut entries: Vec<IndexEntry> = Vec::new();
-    // let ignore_files = base::gilltter_get_ignorefile()?;
-    if let Err(why) = traverse_dirs_impl(&mut entries, path) {
+    let ignore_files = ignore::gilltter_get_ignorefile()?;
+    if let Err(why) = traverse_dirs_impl(&mut entries, path, &ignore_files) {
         return Err(why);
     }
     Ok(entries)
@@ -272,7 +278,7 @@ pub(crate) fn gilltter_status() -> anyhow::Result<()> {
     let work_tree_files = traverse_dirs(dir)?;
 
     // Сначала найдем untracked файлы => untracked файл это значит он есть в ворк три но нет в index
-    // let untracked_files = get_untracked(&work_tree_files, &index);
+    let untracked_files = get_untracked(&work_tree_files, &index);
 
     // Теперь с оставшимися нужно сделать unstaged
     let unstaged_files = get_unstaged(&work_tree_files, &index);
@@ -306,11 +312,11 @@ pub(crate) fn gilltter_status() -> anyhow::Result<()> {
     }
     println!();
 
-    // println!("{}", "==== Untracked Files ====".magenta().bold());
-    // for entry in &untracked_files {
-    //     println!("  {} {:?}", "untracked:".magenta(), entry.filename);
-    // }
-    // println!();
+    println!("{}", "==== Untracked Files ====".magenta().bold());
+    for entry in &untracked_files {
+        println!("  {} {:?}", "untracked:".magenta(), entry.filename);
+    }
+    println!();
 
     Ok(())
 }

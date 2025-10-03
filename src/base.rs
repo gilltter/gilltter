@@ -66,15 +66,3 @@ pub(crate) fn gilltter_add(filepath: &Path) -> anyhow::Result<String> {
     let sha_hash = blob.dump_to_file()?;
     Ok(sha_hash)
 }
-
-pub(crate) fn gilltter_get_ignorefile() -> anyhow::Result<Vec<String>> {
-    let mut result = Vec::new();
-    let file = File::open(GILLTTER_IGNORE_FILE)?;
-
-    let reader = BufReader::new(file);
-    for line in reader.lines().into_iter() {
-        let line = line?;
-        result.push(line);
-    }
-    Ok(result)
-}

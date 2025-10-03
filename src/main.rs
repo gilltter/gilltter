@@ -11,6 +11,7 @@ use crate::{
 mod base;
 mod commands;
 mod config;
+mod ignore;
 mod index;
 mod objects;
 mod utils;

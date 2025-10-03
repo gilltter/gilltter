@@ -14,20 +14,23 @@ use std::{
 pub enum IndexType {
     RegularFile,
     SymbolicLink,
+    // Directory, // for traversing
 }
 
 impl IndexType {
     pub fn to_bytes(&self) -> Vec<u8> {
-        // TODO: Make it take a byte, not 6
         match self {
             Self::RegularFile => b"100644".to_vec(),
             Self::SymbolicLink => b"120000".to_vec(),
+            // Self::Directory => b"040000".to_vec(),
         }
     }
+
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
         match bytes {
             b"100644" => Some(Self::RegularFile),
             b"120000" => Some(Self::SymbolicLink),
+            // b"040000" => Some(Self::Directory),
             _ => None,
         }
     }

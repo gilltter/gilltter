@@ -1,12 +1,20 @@
 use std::{os::unix::fs::MetadataExt, path::Path};
 
+use anyhow::anyhow;
+
 use crate::{
-    base::{self, GILLTTER_INDEX_FILE, GILLTTER_PATH},
+    base::{self, GILLTTER_IGNORE_FILE, GILLTTER_INDEX_FILE, GILLTTER_PATH},
+    ignore::{self, should_ignore},
     index::index::{Index, IndexEntry, IndexType},
     objects::{ObjectDump, ObjectPump},
 };
 
 pub fn add(filepath: &Path) -> anyhow::Result<()> {
+    let ignore_files = ignore::gilltter_get_ignorefile()?;
+    if should_ignore(filepath.as_os_str(), &ignore_files)? {
+        return Err(anyhow!("This file is ignored by {}", GILLTTER_IGNORE_FILE));
+    }
+
     let mut index = Index::from_file(&Path::new(GILLTTER_PATH).join(GILLTTER_INDEX_FILE))
         .expect("Index fucked up");
 
