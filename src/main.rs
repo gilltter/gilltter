@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 use clap::{Parser, Subcommand, arg, command};
 
 use crate::{
-    base::{GILLTER_CONFIG_FILE, GILLTTER_INDEX_FILE, GILLTTER_PATH}, config::Config, index::index::Index, objects::ObjectPump
+    base::{GILLTTER_INDEX_FILE, GILLTTER_PATH},
+    index::index::Index,
+    objects::ObjectPump,
 };
 
 mod base;
@@ -61,17 +63,6 @@ enum AddCommands {
 }
 
 fn main() {
-    let config = Config::from_file(&Path::new(GILLTTER_PATH).join(GILLTER_CONFIG_FILE)).unwrap();
-    println!("{}, {}", config.get("general", "username").unwrap(), config.get("general", "email").unwrap());
-
-
-
-    return;
-    // base::gilltter_status().unwrap();
-
-    // return;
-    // println!("Welcome to {}", "Penis".red().bold());
-
     let args = Cli::parse();
     match args.command {
         Commands::Init {} => base::gilltter_init().unwrap(),

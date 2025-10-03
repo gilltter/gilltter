@@ -1,15 +1,9 @@
-use anyhow::anyhow;
-use colored::Colorize;
 use std::fs::{self, File};
-use std::io::{ErrorKind, Read, Write};
-use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
+use std::io::{BufRead, BufReader, ErrorKind, Read};
+use std::path::Path;
 
-use crate::index::index::{Index, IndexEntry, IndexType};
+use crate::objects::ObjectDump;
 use crate::objects::blob::Blob;
-use crate::objects::commit::Commit;
-use crate::objects::tree::{Tree, TreeObject};
-use crate::objects::{ObjectDump, ObjectPump};
 use crate::utils;
 
 pub const GILLTTER_PATH: &'static str = ".gilltter";
@@ -20,6 +14,7 @@ pub const GILLTER_STATE_FILE: &'static str = "state"; // A.k.a git INDEX file
 pub const GILLTER_BRANCHES_DIR: &'static str = "branches";
 pub const GILLTER_CONFIG_FILE: &'static str = "config";
 pub const GILLTTER_INDEX_FILE: &'static str = "index";
+pub const GILLTTER_IGNORE_FILE: &'static str = ".gignore";
 
 pub fn create_gilltter_project() -> anyhow::Result<()> {
     if !fs::exists(GILLTTER_PATH)?
@@ -70,4 +65,16 @@ pub(crate) fn gilltter_add(filepath: &Path) -> anyhow::Result<String> {
 
     let sha_hash = blob.dump_to_file()?;
     Ok(sha_hash)
+}
+
+pub(crate) fn gilltter_get_ignorefile() -> anyhow::Result<Vec<String>> {
+    let mut result = Vec::new();
+    let file = File::open(GILLTTER_IGNORE_FILE)?;
+
+    let reader = BufReader::new(file);
+    for line in reader.lines().into_iter() {
+        let line = line?;
+        result.push(line);
+    }
+    Ok(result)
 }

@@ -1,13 +1,14 @@
 use anyhow::anyhow;
 use colored::Colorize;
 use std::{
+    collections::{BTreeSet, HashSet},
     io::Read,
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
 };
 
 use crate::{
-    base::{GILLTER_HEAD_FILE, GILLTER_OBJECTS_DIR, GILLTTER_INDEX_FILE, GILLTTER_PATH},
+    base::{self, GILLTER_HEAD_FILE, GILLTER_OBJECTS_DIR, GILLTTER_INDEX_FILE, GILLTTER_PATH},
     index::index::{Index, IndexEntry, IndexType},
     objects::{
         ObjectPump,
@@ -17,9 +18,12 @@ use crate::{
     utils,
 };
 
+static DONT_TRACK_DIRS: &[&str] = &[".gilltter"];
+
 fn traverse_dirs_impl(
     entries: &mut Vec<IndexEntry>,
     path: std::path::PathBuf,
+    // ignore_files: &Vec<String>,
 ) -> anyhow::Result<()> {
     let dir = path;
     let root_path = std::env::current_dir()?;
@@ -28,7 +32,6 @@ fn traverse_dirs_impl(
         let filetype = entry.file_type()?;
         if filetype.is_file() {
             let meta = std::fs::metadata(entry.path())?;
-
             let content = utils::get_file_contents_as_blob(&entry.path())?;
             let sha1 = utils::generate_hash(&content);
 
@@ -42,11 +45,12 @@ fn traverse_dirs_impl(
                 sha1,
             ));
         } else if filetype.is_dir() {
-            // TODO: Get rid of this shit
-            if entry.file_name() == "target"
-                || entry.file_name() == ".gilltter"
-                || entry.file_name() == ".git"
-            {
+            if DONT_TRACK_DIRS.contains(
+                &entry
+                    .file_name()
+                    .to_str()
+                    .ok_or(anyhow!("Could not convert OsStr to &str"))?,
+            ) {
                 continue;
             }
             traverse_dirs_impl(entries, entry.path())?;
@@ -57,6 +61,7 @@ fn traverse_dirs_impl(
 
 pub fn traverse_dirs(path: std::path::PathBuf) -> anyhow::Result<Vec<IndexEntry>> {
     let mut entries: Vec<IndexEntry> = Vec::new();
+    // let ignore_files = base::gilltter_get_ignorefile()?;
     if let Err(why) = traverse_dirs_impl(&mut entries, path) {
         return Err(why);
     }
